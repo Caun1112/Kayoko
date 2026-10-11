@@ -34,6 +34,7 @@ KayokoCore_FRAMEWORKS += QuartzCore
 KayokoCore_FRAMEWORKS += QuickLook
 KayokoCore_FRAMEWORKS += Security
 KayokoCore_FRAMEWORKS += UIKit
+KayokoCore_FRAMEWORKS += Vision
 KayokoCore_PRIVATE_FRAMEWORKS += CoreServices
 KayokoCore_PRIVATE_FRAMEWORKS += DataDetectorsUI
 

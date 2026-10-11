@@ -138,6 +138,7 @@ targets:
       - sdk: QuartzCore.framework
       - sdk: Security.framework
       - sdk: UIKit.framework
+      - sdk: Vision.framework
       - sdk: Foundation.framework
     postCompileScripts:
       - name: Copy Substrate Filter Plist

@@ -49,6 +49,10 @@ NSString *const kKayokoContinuityBundleIdentifier = @"com.apple.continuity";
     if ([note isKindOfClass:[NSString class]] && [note length] > 0) {
         [item setNote:note];
     }
+    id ocrText = dictionary[kKayokoItemKeyOCRText];
+    if ([ocrText isKindOfClass:[NSString class]] && [ocrText length] > 0) {
+        [item setOcrText:ocrText];
+    }
     id capturedAt = dictionary[kKayokoItemKeyCapturedAt];
     if ([capturedAt isKindOfClass:[NSNumber class]]) {
         NSTimeInterval capturedAtTimestamp = [capturedAt doubleValue];
@@ -100,6 +104,9 @@ NSString *const kKayokoContinuityBundleIdentifier = @"com.apple.continuity";
     }
     if ([[self note] length] > 0) {
         dictionary[kKayokoItemKeyNote] = [self note];
+    }
+    if ([[self ocrText] length] > 0) {
+        dictionary[kKayokoItemKeyOCRText] = [self ocrText];
     }
     if ([[self richTextUTI] length] > 0 && [[self richTextName] length] > 0) {
         dictionary[kKayokoItemKeyRichTextUTI] = [self richTextUTI];

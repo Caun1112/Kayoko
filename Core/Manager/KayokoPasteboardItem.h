@@ -23,6 +23,7 @@ static NSString *const kKayokoItemKeyImagePixelHeight = @"image_height";
 static NSString *const kKayokoItemKeyRichTextUTI = @"rich_text_uti";
 static NSString *const kKayokoItemKeyRichTextName = @"rich_text_name";
 static NSString *const kKayokoItemKeyImageByteCount = @"image_byte_count";
+static NSString *const kKayokoItemKeyOCRText = @"ocr_text";
 
 @interface KayokoPasteboardItem : NSObject
 
@@ -32,6 +33,8 @@ static NSString *const kKayokoItemKeyImageByteCount = @"image_byte_count";
 @property(nonatomic, copy) NSString *imageName;
 @property(nonatomic, copy, nullable) NSString *tagUUID;
 @property(nonatomic, copy, nullable) NSString *note;
+// 图片经本机 OCR 识别出的文字（见 KayokoImageTextRecognizer），供搜索使用，非用户编辑内容。
+@property(nonatomic, copy, nullable) NSString *ocrText;
 @property(nonatomic, copy) NSDate *capturedAt;
 @property(nonatomic, assign) NSUInteger imagePixelWidth;
 @property(nonatomic, assign) NSUInteger imagePixelHeight;

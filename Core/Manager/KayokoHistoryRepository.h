@@ -58,6 +58,10 @@ typedef void (^KayokoHistoryAppBundleIdentifiersCompletion)(NSArray<NSString *> 
 forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
      inHistoryKey:(NSString *)historyKey
        completion:(nullable void (^)(BOOL success))completion;
+- (void)setOCRText:(nullable NSString *)ocrText
+    forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
+         inHistoryKey:(NSString *)historyKey
+           completion:(nullable void (^)(BOOL success))completion;
 - (void)replaceContent:(NSString *)content
      forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
           inHistoryKey:(NSString *)historyKey

@@ -9,6 +9,7 @@
 #import "KayokoCoreRuntime.h"
 #import "KayokoHistoryChangeNotifier.h"
 #import "KayokoHistoryRepository.h"
+#import "KayokoImageTextRecognizer.h"
 #import "KayokoKeyboardHostResolver.h"
 #import "KayokoKeyboardShortcutSender.h"
 #import "KayokoNotificationKeys.h"
@@ -708,12 +709,47 @@ NS_ASSUME_NONNULL_END
     }
 
     BOOL didSaveAnyItem = NO;
+    NSMutableArray<NSDictionary<NSString *, id> *> *savedImageDictionaries = [[NSMutableArray alloc] init];
     for (KayokoPasteboardItem *item in items) {
         if ([self addPasteboardItem:item toHistoryWithKey:historyKey]) {
             didSaveAnyItem = YES;
+            if ([[item imageName] length] > 0) {
+                [savedImageDictionaries addObject:[item dictionaryRepresentation]];
+            }
         }
     }
+    [self scheduleImageTextRecognitionForItemDictionaries:savedImageDictionaries inHistoryKey:historyKey];
     return didSaveAnyItem;
+}
+
+#pragma mark - Image Text Recognition
+
+- (void)scheduleImageTextRecognitionForItemDictionaries:(NSArray<NSDictionary<NSString *, id> *> *)dictionaries
+                                          inHistoryKey:(NSString *)historyKey {
+    KayokoHistoryRepository *historyRepository = _historyRepository;
+    for (NSDictionary<NSString *, id> *dictionary in dictionaries) {
+        KayokoPasteboardItem *item = [KayokoPasteboardItem itemFromDictionary:dictionary];
+        NSString *imageName = [item imageName];
+        // iOS 15 及更早的批量保存路径拿到的是库里回读的字典，可能已带识别结果，这时跳过。
+        // iOS 16+ 路径传入的是刚捕获的新条目，必然没有结果，重复复制同一张图会重跑一次 OCR——
+        // 结果相同且幂等，代价只是后台队列多算一遍，暂不为它引入内容哈希。
+        if ([imageName length] == 0 || [[item ocrText] length] > 0) {
+            continue;
+        }
+
+        NSString *imagePath = [[KayokoPasteboardManager historyImagesPath] stringByAppendingPathComponent:imageName];
+        [[KayokoImageTextRecognizer sharedRecognizer]
+            recognizeTextInImageAtPath:imagePath
+                            completion:^(NSString *_Nullable text) {
+                              if ([text length] == 0) {
+                                  return;
+                              }
+                              [historyRepository setOCRText:text
+                                         forItemDictionary:dictionary
+                                              inHistoryKey:historyKey
+                                                completion:nil];
+                            }];
+    }
 }
 
 - (void)savePasteboardItems:(NSArray<KayokoPasteboardItem *> *)items
@@ -760,6 +796,8 @@ NS_ASSUME_NONNULL_END
                                                         itemDictionary:dictionary
                                                                  limit:limit];
                    }
+                   [strongSelf scheduleImageTextRecognitionForItemDictionaries:savedDictionaries
+                                                                  inHistoryKey:historyKey];
                    if (completion) {
                        completion([savedDictionaries count] > 0);
                    }

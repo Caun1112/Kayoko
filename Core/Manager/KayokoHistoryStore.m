@@ -224,6 +224,10 @@ NS_ASSUME_NONNULL_END
         return NO;
     }
 
+    if (![self ensureOCRTextColumnWithError:error]) {
+        return NO;
+    }
+
     if (![self backfillImageDimensionsIfNeededWithError:error]) {
         return NO;
     }
@@ -584,6 +588,21 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     return NO;
 }
 
+- (BOOL)setOCRText:(NSString *)ocrText
+    forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
+         inHistoryKey:(NSString *)historyKey
+                error:(NSError **)error {
+    NSString *content = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyContent fallback:nil];
+    if ([content length] == 0 || [historyKey length] == 0) {
+        return YES;
+    }
+
+    // 自由文本搜索直接 LIKE 各文本列，不经过 search tokens，因此这里无需重建索引。
+    return [self executeStatement:@"UPDATE history_items SET ocr_text = ? WHERE history_key = ? AND content = ?"
+                         bindings:@[ ocrText ?: @"", historyKey, content ]
+                            error:error];
+}
+
 - (BOOL)replaceContent:(NSString *)content
      forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
           inHistoryKey:(NSString *)historyKey
@@ -747,7 +766,7 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     }
     sqlite3_stmt *statement = NULL;
     const char *sql = "SELECT bundle_identifier, content, image_name, has_link, tag_uuid, note, created_at, "
-                      "image_width, image_height, rich_text_uti, rich_text_name, image_byte_count "
+                      "image_width, image_height, rich_text_uti, rich_text_name, image_byte_count, ocr_text "
                       "FROM history_items WHERE history_key = ? AND content = ? AND image_name = ?";
     if (![self prepareStatement:sql statement:&statement error:error]) return nil;
     [self bindObjects:@[ historyKey, imageName, imageName ] toStatement:statement];
@@ -966,18 +985,22 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     NSMutableString *sql =
         [NSMutableString stringWithString:@"SELECT bundle_identifier, content, image_name, has_link, "
                                            "tag_uuid, note, created_at, image_width, image_height, rich_text_uti, "
-                                           "rich_text_name, image_byte_count "
+                                           "rich_text_name, image_byte_count, ocr_text "
                                            "FROM history_items WHERE history_key = ?"];
     NSMutableArray<id> *bindings = [NSMutableArray arrayWithObject:historyKey ?: @""];
 
     if ([searchCriteria hasSearchText]) {
         NSString *searchPattern = [self likePatternForSearchText:[searchCriteria searchText]];
+        // ocr_text 让图片也能被图内文字检索到；非图片项该列为空，不产生额外匹配。
         if ([[searchCriteria categoryValue] isEqualToString:kKayokoSearchCategoryImage]) {
-            [sql appendString:@" AND note LIKE ? ESCAPE '\\'"];
+            [sql appendString:@" AND (note LIKE ? ESCAPE '\\' OR ocr_text LIKE ? ESCAPE '\\')"];
+            [bindings addObject:searchPattern];
             [bindings addObject:searchPattern];
         } else {
             [sql appendString:@" AND ((image_name = '' AND content LIKE ? ESCAPE '\\') "
-                               "OR note LIKE ? ESCAPE '\\')"];
+                               "OR note LIKE ? ESCAPE '\\' "
+                               "OR ocr_text LIKE ? ESCAPE '\\')"];
+            [bindings addObject:searchPattern];
             [bindings addObject:searchPattern];
             [bindings addObject:searchPattern];
         }
@@ -1037,7 +1060,7 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
 - (NSDictionary<NSString *, id> *)latestItemForHistoryKey:(NSString *)historyKey error:(NSError **)error {
     sqlite3_stmt *statement = NULL;
     const char *sql = "SELECT bundle_identifier, content, image_name, has_link, tag_uuid, note, created_at, "
-                      "image_width, image_height, rich_text_uti, rich_text_name, image_byte_count "
+                      "image_width, image_height, rich_text_uti, rich_text_name, image_byte_count, ocr_text "
                       "FROM history_items WHERE history_key = ? ORDER BY sequence DESC LIMIT 1";
 
     if (![self prepareStatement:sql statement:&statement error:error]) {
@@ -1267,6 +1290,13 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     return [self ensureColumnNamed:@"image_byte_count"
                            inTable:@"history_items"
                usingAlterStatement:@"ALTER TABLE history_items ADD COLUMN image_byte_count INTEGER NOT NULL DEFAULT 0"
+                             error:error];
+}
+
+- (BOOL)ensureOCRTextColumnWithError:(NSError **)error {
+    return [self ensureColumnNamed:@"ocr_text"
+                           inTable:@"history_items"
+               usingAlterStatement:@"ALTER TABLE history_items ADD COLUMN ocr_text TEXT NOT NULL DEFAULT ''"
                              error:error];
 }
 
@@ -1731,8 +1761,8 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     }
 
     sqlite3_stmt *statement = NULL;
-    const char *sql =
-        "SELECT tag_uuid, note, rich_text_name FROM history_items WHERE history_key = ? AND content = ? LIMIT 1";
+    const char *sql = "SELECT tag_uuid, note, rich_text_name, ocr_text FROM history_items "
+                      "WHERE history_key = ? AND content = ? LIMIT 1";
     if (![self prepareStatement:sql statement:&statement error:error]) {
         return @{};
     }
@@ -1745,6 +1775,7 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
         NSString *tagUUID = [self stringFromColumn:statement index:0];
         NSString *note = [self stringFromColumn:statement index:1];
         NSString *richTextName = [self stringFromColumn:statement index:2];
+        NSString *ocrText = [self stringFromColumn:statement index:3];
         if ([tagUUID length] > 0) {
             metadata[kKayokoItemKeyTagUUID] = tagUUID;
         }
@@ -1753,6 +1784,9 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
         }
         if ([richTextName length] > 0) {
             metadata[kKayokoItemKeyRichTextName] = richTextName;
+        }
+        if ([ocrText length] > 0) {
+            metadata[kKayokoItemKeyOCRText] = ocrText;
         }
     } else if (stepResult != SQLITE_DONE) {
         [self populateError:error code:stepResult message:[NSString stringWithUTF8String:sql]];
@@ -1808,6 +1842,11 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     if ([note length] == 0) {
         note = storedMetadata[kKayokoItemKeyNote];
     }
+    NSString *ocrText = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyOCRText fallback:nil];
+    if ([ocrText length] == 0) {
+        // 重复复制同一张图、或收藏/历史间移动时，别把已经识别好的文字丢掉。
+        ocrText = storedMetadata[kKayokoItemKeyOCRText];
+    }
     NSString *richTextUTI = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyRichTextUTI fallback:nil];
     NSString *richTextName = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyRichTextName fallback:@""];
     if ([richTextUTI length] == 0 || [richTextName length] == 0) {
@@ -1836,13 +1875,13 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
                    @"INSERT INTO history_items "
                     "(history_key, bundle_identifier, content, image_name, image_width, image_height, "
                     "image_byte_count, rich_text_uti, rich_text_name, has_link, created_at, updated_at, sequence, "
-                    "tag_uuid, note, search_index_version) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)"
+                    "tag_uuid, note, ocr_text, search_index_version) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)"
                        bindings:@[
                            historyKey, bundleIdentifier, content, imageName, @(imagePixelWidth), @(imagePixelHeight),
                            @(imageByteCount), [richTextUTI length] > 0 ? richTextUTI : (id)[NSNull null], richTextName,
                            hasLink, capturedAt, now, sequence, [tagUUID length] > 0 ? tagUUID : (id)[NSNull null],
-                           [note length] > 0 ? note : (id)[NSNull null]
+                           [note length] > 0 ? note : (id)[NSNull null], ocrText ?: @""
                        ]
                           error:error]) {
         return NO;
@@ -2185,6 +2224,7 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     NSString *richTextUTI = [self stringFromColumn:statement index:9];
     NSString *richTextName = [self stringFromColumn:statement index:10];
     sqlite3_int64 imageByteCount = MAX(sqlite3_column_int64(statement, 11), 0);
+    NSString *ocrText = [self stringFromColumn:statement index:12];
 
     NSMutableDictionary<NSString *, id> *dictionary = [@{
         kKayokoItemKeyBundleIdentifier : bundleIdentifier,
@@ -2201,6 +2241,9 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     }
     if ([note length] > 0) {
         dictionary[kKayokoItemKeyNote] = note;
+    }
+    if ([ocrText length] > 0) {
+        dictionary[kKayokoItemKeyOCRText] = ocrText;
     }
     if ([richTextUTI length] > 0 && [richTextName length] > 0) {
         dictionary[kKayokoItemKeyRichTextUTI] = richTextUTI;

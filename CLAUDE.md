@@ -69,6 +69,20 @@ KayokoCoreRuntime            单例：偏好加载、面板生命周期、锁屏
 
 约定：**UI 层只能调 `KayokoPasteboardManager`**，绝不直接碰 `KayokoHistoryStore`；DB 操作全部走 Repository 的串行队列，重活（写粘贴板）走 `com.mlgm.kayoko.queue.pasteboard`。所有跨层传递的对象都是 `NSDictionary`（模型对象是 `KayokoPasteboardItem`，落库为字典）。
 
+### 图片 OCR
+
+复制的图片会做一次本机文字识别，结果写进 `history_items.ocr_text`，让图片能被图内文字搜到（`KayokoImageTextRecognizer`，用系统 Vision 的 `VNRecognizeTextRequest`，语言 `zh-Hans` + `en-US`，失败时退回系统默认语言）。
+
+链路：`KayokoPasteboardManager` 在图片条目落库后调用 `scheduleImageTextRecognitionForItemDictionaries:inHistoryKey:`，识别完成后经 `KayokoHistoryRepository setOCRText:...` 回填该行。
+
+三个必须留意的点：
+
+- **识别不能跑在 `_pasteboardQueue` 上**。该队列同时承担自动粘贴的写入，被 OCR（accurate 模式，可达秒级）占住会直接让点选粘贴变卡。识别器因此持有自己的串行队列 `com.mlgm.kayoko.queue.ocr`，连磁盘读取也放在那里，调用方只做入队。
+- **识别发生在 SpringBoard 进程内**，所以送进 Vision 前会把长边降采样到 2048（`kKayokoImageTextRecognizerMaximumDimension`）以压低内存峰值，避免被 jetsam 杀掉。
+- `ocr_text` 是 `NOT NULL DEFAULT ''`，绑定时给空串而不是 `NSNull`（对比 `note` 是可空列）。upsert 时若字典里没有识别结果会回退到库中已有值，收藏/历史之间移动、重复复制同一张图都不会丢结果。
+
+搜索结果里图片项**只靠 `note` 和 `ocr_text` 命中**，`content`（即图片文件名）不参与匹配——这是刻意为之，避免随机文件名造成误命中。
+
 Coordinators 是不继承 VC 的普通对象，持有跨页面状态（已加载/脏的 history key、搜索态、被延迟的外部隐藏请求）；Views 是被动的，Controllers 每个页面对应一个 View。
 
 ### 持久化

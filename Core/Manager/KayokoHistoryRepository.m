@@ -270,6 +270,24 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     }];
 }
 
+- (void)setOCRText:(NSString *)ocrText
+    forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
+         inHistoryKey:(NSString *)historyKey
+           completion:(void (^)(BOOL success))completion {
+    [self performAsync:^{
+      NSError *error = nil;
+      KayokoHistoryStore *historyStore = [self preparedHistoryStoreOnQueueWithError:&error];
+      BOOL success = historyStore && [historyStore setOCRText:ocrText
+                                            forItemDictionary:dictionary
+                                                 inHistoryKey:historyKey
+                                                        error:&error];
+      if (!success) {
+          HBLogDebug(@"Kayoko: Failed to set history item OCR text: %@", error);
+      }
+      [self dispatchCompletion:completion success:success];
+    }];
+}
+
 - (void)replaceContent:(NSString *)content
      forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
           inHistoryKey:(NSString *)historyKey
