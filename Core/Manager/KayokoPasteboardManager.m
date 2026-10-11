@@ -969,6 +969,7 @@ forPasteboardItem:(KayokoPasteboardItem *)item
       KayokoPasteboardItem *updatedItem = [KayokoPasteboardItem itemFromDictionary:updatedDictionary];
       if (updatedItem) {
           [self resetThumbnailMemoryCache];
+          [self scheduleImageTextRecognitionForItemDictionaries:@[ updatedDictionary ] inHistoryKey:historyKey];
           [self postHistoryChangedNotificationForHistoryKey:historyKey
                                                  changeType:kKayokoPasteboardManagerHistoryChangeTypeReload
                                              itemDictionary:updatedDictionary
@@ -1014,6 +1015,7 @@ forPasteboardItem:(KayokoPasteboardItem *)item
       KayokoPasteboardItem *updatedItem = [KayokoPasteboardItem itemFromDictionary:updatedDictionary];
       if (updatedItem) {
           [self resetThumbnailMemoryCache];
+          [self scheduleImageTextRecognitionForItemDictionaries:@[ updatedDictionary ] inHistoryKey:historyKey];
           [self postHistoryChangedNotificationForHistoryKey:historyKey
                                                  changeType:kKayokoPasteboardManagerHistoryChangeTypeReload
                                              itemDictionary:updatedDictionary

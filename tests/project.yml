@@ -1,0 +1,45 @@
+name: KayokoEditorTests
+options:
+  deploymentTarget:
+    iOS: "14.0"
+settings:
+  base:
+    CLANG_ENABLE_OBJC_ARC: YES
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  KayokoEditorTestHost:
+    type: application
+    platform: iOS
+    sources:
+      - Host
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mlgm.kayoko.editor-test-host
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+  KayokoFingerImageRendererTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - KayokoFingerImageRendererTests.m
+      - ../Core/Models/KayokoFingerImageRenderer.m
+      - ../Core/Models/KayokoFingerImageRenderer.h
+    dependencies:
+      - target: KayokoEditorTestHost
+      - sdk: UIKit.framework
+      - sdk: CoreImage.framework
+      - sdk: ImageIO.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mlgm.kayoko.editor-tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  KayokoEditorTests:
+    build:
+      targets:
+        KayokoEditorTestHost: all
+        KayokoFingerImageRendererTests: [test]
+    test:
+      targets:
+        - KayokoFingerImageRendererTests

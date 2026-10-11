@@ -18,6 +18,7 @@ static CGFloat const kKayokoHeaderContentSpacing = 4;
 @property(nonatomic, strong, readonly) UIControl *titleTapControl;
 @property(nonatomic, strong, readonly) UIButton *leadingButton;
 @property(nonatomic, strong, readonly) UIButton *editButton;
+@property(nonatomic, strong, readonly) UIButton *imageToolsButton;
 @property(nonatomic, strong, readonly) UIButton *trailingButton;
 @property(nonatomic, strong, readonly) UIButton *alternateTrailingButton;
 @property(nonatomic, strong, readonly) UIButton *openLinkButton;

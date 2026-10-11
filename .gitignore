@@ -15,3 +15,4 @@ packages/*
 
 **/xcuserdata/
 *.xcuserstate
+tests/KayokoEditorTests.xcodeproj/

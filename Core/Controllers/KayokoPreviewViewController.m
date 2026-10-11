@@ -10,6 +10,7 @@
 #import "KayokoActivitySharePresenter.h"
 #import "KayokoHistoryItemActionHandler.h"
 #import "KayokoImageEditPresenter.h"
+#import "KayokoFingerEditorViewController.h"
 #import "KayokoPasteboardItem.h"
 #import "KayokoPasteboardManager.h"
 #import "KayokoPreviewView.h"
@@ -39,6 +40,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) KayokoActivitySharePresenter *activitySharePresenter;
 @property(nonatomic, strong) KayokoTextActionPresenter *textActionPresenter;
 @property(nonatomic, strong) KayokoImageEditPresenter *imageEditPresenter;
+@property(nonatomic, strong, nullable) KayokoFingerEditorViewController *fingerEditor;
 @property(nonatomic, assign) BOOL imageRestoreAvailable;
 @property(nonatomic, assign) BOOL imageRestoreInProgress;
 @property(nonatomic, strong, nullable) UIAlertController *imageRestoreAlert;
@@ -80,6 +82,8 @@ NS_ASSUME_NONNULL_END
             forControlEvents:UIControlEventTouchUpInside];
         [[[_previewView headerView] alternateTrailingButton] addTarget:self
             action:@selector(handleRestoreImageButtonPressed) forControlEvents:UIControlEventTouchUpInside];
+        [[[_previewView headerView] imageToolsButton] addTarget:self
+            action:@selector(handleImageToolsButtonPressed) forControlEvents:UIControlEventTouchUpInside];
         [self setView:_previewView];
     }
     return self;
@@ -241,6 +245,12 @@ NS_ASSUME_NONNULL_END
                                                                                             value:nil
                                                                                             table:@"Tweak"]];
     [self setEditButtonHidden:NO];
+    UIButton *toolsButton = headerView.imageToolsButton;
+    [headerView updateStyleForButton:toolsButton withImageName:@"slider.horizontal.3"
+                          imageSize:kKayokoBackButtonImageSize tintColor:UIColor.labelColor];
+    toolsButton.accessibilityLabel = KayokoPreviewLocalizedString(@"Image Tools");
+    toolsButton.accessibilityHint = KayokoPreviewLocalizedString(@"Open the current image in FingerEditor");
+    toolsButton.hidden = self.previewItem.imageName.length == 0;
     [self setEditButtonEnabled:YES];
 }
 
@@ -250,6 +260,8 @@ NS_ASSUME_NONNULL_END
     if (hidden) {
         [editButton setEnabled:NO];
         [editButton setAlpha:0];
+        self.previewView.headerView.imageToolsButton.hidden = YES;
+        self.previewView.headerView.imageToolsButton.enabled = NO;
     }
 }
 
@@ -257,6 +269,9 @@ NS_ASSUME_NONNULL_END
     UIButton *editButton = [[[self previewView] headerView] editButton];
     [editButton setEnabled:enabled];
     [editButton setAlpha:(enabled && ![editButton isHidden]) ? 1.0 : 0.35];
+    UIButton *toolsButton = self.previewView.headerView.imageToolsButton;
+    toolsButton.enabled = enabled && !toolsButton.hidden;
+    toolsButton.alpha = toolsButton.enabled ? 1.0 : 0.35;
 }
 
 - (BOOL)canEditPreviewItem {
@@ -313,9 +328,68 @@ NS_ASSUME_NONNULL_END
     }
 }
 
+- (void)handleImageToolsButtonPressed {
+    if (![self canEditPreviewItem] || !self.previewItem.imageName.length || self.imageRestoreInProgress ||
+        !self.previewView.headerView.imageToolsButton.enabled || self.fingerEditor) return;
+    [self setEditButtonEnabled:NO];
+    [self.delegate previewViewControllerDidRequestImageTools:self];
+}
+
+- (void)beginImageTools {
+    KayokoPasteboardItem *item = self.previewItem;
+    NSString *historyKey = self.sourceHistoryKey;
+    UIViewController *presenter = self.parentViewController ?: self;
+    if (!item.imageName.length || !historyKey.length || self.previewView.hidden || self.fingerEditor ||
+        !presenter.viewIfLoaded.window || presenter.viewIfLoaded.window.hidden || presenter.presentedViewController ||
+        presenter.isBeingPresented || presenter.isBeingDismissed) {
+        [self setEditButtonEnabled:YES];
+        return;
+    }
+    NSUInteger generation = self.previewGeneration;
+    KayokoPasteboardItem *snapshot = [KayokoPasteboardItem itemFromDictionary:item.dictionaryRepresentation];
+    NSURL *URL = [NSURL fileURLWithPath:[[KayokoPasteboardManager historyImagesPath] stringByAppendingPathComponent:item.imageName]];
+    __weak typeof(self) weakSelf = self;
+    __block KayokoPasteboardItem *savedItem = nil;
+    KayokoFingerEditorViewController *editor = [[KayokoFingerEditorViewController alloc] initWithImageURL:URL
+        saveHandler:^(NSURL *outputURL, void (^saveCompletion)(NSError *)) {
+            [[KayokoPasteboardManager sharedInstance] replaceImageForPasteboardItem:snapshot inHistoryWithKey:historyKey
+                editedFileURL:outputURL completion:^(KayokoPasteboardItem *updatedItem, NSError *error) {
+                    savedItem = updatedItem;
+                    if (!updatedItem && !error) error = [NSError errorWithDomain:@"com.mlgm.kayoko.image-tools" code:1
+                        userInfo:@{NSLocalizedDescriptionKey: KayokoPreviewLocalizedString(@"Unable to Save Image")}];
+                    saveCompletion(error);
+                }];
+        } didFinish:^(BOOL saved) {
+            KayokoPreviewViewController *strongSelf = weakSelf;
+            KayokoFingerEditorViewController *activeEditor = strongSelf.fingerEditor;
+            if (!strongSelf || !activeEditor || strongSelf.previewGeneration != generation) return;
+            [activeEditor.presentingViewController dismissViewControllerAnimated:YES completion:^{
+                KayokoPreviewViewController *current = weakSelf;
+                [activeEditor invalidate];
+                if (!current || current.fingerEditor != activeEditor) return;
+                current.fingerEditor = nil;
+                if (current.previewGeneration != generation || current.previewItem != item || current.previewView.hidden) return;
+                if (saved && savedItem) [current showPreviewWithItem:savedItem sourceHistoryKey:historyKey];
+                else [current setEditButtonEnabled:YES];
+                [current.delegate previewViewControllerDidFinishImageEditing:current];
+            }];
+        }];
+    self.fingerEditor = editor;
+    [presenter presentViewController:editor animated:YES completion:^{
+        if (weakSelf.fingerEditor != editor) [editor dismissViewControllerAnimated:NO completion:nil];
+    }];
+    if (self.hapticFeedbackHandler) self.hapticFeedbackHandler(UIImpactFeedbackStyleLight);
+}
+
 - (void)dismissImageEditing {
     self.previewGeneration++;
     [[self imageEditPresenter] dismissEditingAnimated:NO];
+    KayokoFingerEditorViewController *editor = self.fingerEditor;
+    self.fingerEditor = nil;
+    [editor invalidate];
+    if (editor.presentingViewController && !editor.isBeingPresented) {
+        [editor.presentingViewController dismissViewControllerAnimated:NO completion:nil];
+    }
     UIAlertController *alert = self.imageRestoreAlert;
     self.imageRestoreAlert = nil;
     self.imageRestoreInProgress = NO;
@@ -376,7 +450,7 @@ NS_ASSUME_NONNULL_END
 - (void)handleRestoreImageButtonPressed {
     UIViewController *presenter = self.parentViewController ?: self;
     if (!self.imageRestoreAvailable || self.imageRestoreInProgress || self.previewView.hidden ||
-        [self.imageEditPresenter shouldSuppressExternalHideRequest] || !presenter.viewIfLoaded.window ||
+        self.fingerEditor || [self.imageEditPresenter shouldSuppressExternalHideRequest] || !presenter.viewIfLoaded.window ||
         presenter.presentedViewController || presenter.isBeingPresented || presenter.isBeingDismissed) return;
 
     KayokoPasteboardItem *item = self.previewItem;
@@ -536,7 +610,7 @@ NS_ASSUME_NONNULL_END
 }
 
 - (BOOL)shouldSuppressExternalHideRequest {
-    return self.imageRestoreInProgress || [[self imageEditPresenter] shouldSuppressExternalHideRequest] ||
+    return self.fingerEditor != nil || self.imageRestoreInProgress || [[self imageEditPresenter] shouldSuppressExternalHideRequest] ||
            [[self textActionPresenter] shouldSuppressExternalHideRequest];
 }
 

@@ -24,6 +24,7 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
 @property(nonatomic, strong, readwrite) UIControl *titleTapControl;
 @property(nonatomic, strong, readwrite) UIButton *leadingButton;
 @property(nonatomic, strong, readwrite) UIButton *editButton;
+@property(nonatomic, strong, readwrite) UIButton *imageToolsButton;
 @property(nonatomic, strong) UIStackView *trailingButtonStack;
 @property(nonatomic, copy) NSArray<NSLayoutConstraint *> *trailingButtonWidthConstraints;
 @property(nonatomic, strong, readwrite) UIButton *trailingButton;
@@ -119,6 +120,11 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
         [_editButton setHidden:YES];
         [_trailingButtonStack addArrangedSubview:_editButton];
         [_editButton setTranslatesAutoresizingMaskIntoConstraints:NO];
+
+        _imageToolsButton = [[UIButton alloc] init];
+        [_imageToolsButton setHidden:YES];
+        [_trailingButtonStack addArrangedSubview:_imageToolsButton];
+        [_imageToolsButton setTranslatesAutoresizingMaskIntoConstraints:NO];
 
         _alternateTrailingButton = [[UIButton alloc] init];
         [_alternateTrailingButton setHidden:YES];

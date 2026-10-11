@@ -593,13 +593,15 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
          inHistoryKey:(NSString *)historyKey
                 error:(NSError **)error {
     NSString *content = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyContent fallback:nil];
-    if ([content length] == 0 || [historyKey length] == 0) {
+    NSString *imageName = [self stringValueFromDictionary:dictionary key:kKayokoItemKeyImageName fallback:nil];
+    if ([content length] == 0 || [imageName length] == 0 || [historyKey length] == 0) {
         return YES;
     }
 
     // 自由文本搜索直接 LIKE 各文本列，不经过 search tokens，因此这里无需重建索引。
-    return [self executeStatement:@"UPDATE history_items SET ocr_text = ? WHERE history_key = ? AND content = ?"
-                         bindings:@[ ocrText ?: @"", historyKey, content ]
+    // 识别期间图片可能已经被编辑；仅将结果写回发起识别时的那份图片。
+    return [self executeStatement:@"UPDATE history_items SET ocr_text = ? WHERE history_key = ? AND content = ? AND image_name = ?"
+                         bindings:@[ ocrText ?: @"", historyKey, content, imageName ]
                             error:error];
 }
 
@@ -751,7 +753,7 @@ forItemDictionary:(NSDictionary<NSString *, id> *)dictionary
     }
     NSInteger changedCount = 0;
     BOOL success = [self executeStatement:@"UPDATE history_items SET content = ?, image_name = ?, "
-                                           "image_width = ?, image_height = ?, image_byte_count = ?, updated_at = ? "
+                                           "image_width = ?, image_height = ?, image_byte_count = ?, updated_at = ?, ocr_text = '' "
                                            "WHERE history_key = ? AND content = ? AND image_name = ?"
                                  bindings:@[ imageName, imageName, @((NSUInteger)pixelSize.width), @((NSUInteger)pixelSize.height),
                                              @(byteCount), @([NSDate.date timeIntervalSince1970]),

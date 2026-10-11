@@ -1,5 +1,15 @@
 # Third-party notices
 
+## FingerEditor integration
+
+The image tools in `Core/Models/KayokoFingerImageRenderer.*`,
+`Core/Views/KayokoFingerCanvasView.*`, and
+`Core/Controllers/KayokoFingerEditorViewController.*` are a native UIKit adaptation
+of the user-provided [Caun1112/FingerEditor](https://github.com/Caun1112/FingerEditor)
+project (`ImageProcessor.swift`, `EditorTypes.swift`, and the editor interactions).
+They use Apple's UIKit, CoreImage, ImageIO, PhotosUI and Vision frameworks, with no
+bundled third-party binary or separate FingerEditor installation.
+
 ## AltList
 
 Kayoko uses interface stubs for the [AltList framework](https://github.com/opa334/AltList)

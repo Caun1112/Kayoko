@@ -2215,6 +2215,16 @@ NS_ASSUME_NONNULL_END
                                      replacementRange:NSMakeRange(NSNotFound, 0)];
 }
 
+- (void)previewViewControllerDidRequestImageTools:(KayokoPreviewViewController *)controller {
+    if (controller != self.previewViewController || self.mainView.isAnimating ||
+        self.panelPresentationController.isAnimating || [self isNoteEditing]) {
+        [controller setEditButtonEnabled:YES];
+        return;
+    }
+    [self clearExternalHideCoordinator];
+    [controller beginImageTools];
+}
+
 - (void)previewViewControllerDidFinishImageEditing:(KayokoPreviewViewController *)controller {
     if (controller == [self previewViewController] && ![self isHidden] && ![self isDismissingPanel]) {
         [[self delegate] mainViewControllerDidFinishImageEditing:self];

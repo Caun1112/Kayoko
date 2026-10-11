@@ -1,0 +1,43 @@
+name: Image editor regression tests
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Core/Models/KayokoFingerImageRenderer.*'
+      - 'Core/Manager/KayokoHistoryStore.m'
+      - 'tests/**'
+      - '.github/workflows/image-editor-tests.yml'
+  pull_request:
+    paths:
+      - 'Core/Models/KayokoFingerImageRenderer.*'
+      - 'Core/Manager/KayokoHistoryStore.m'
+      - 'tests/**'
+      - '.github/workflows/image-editor-tests.yml'
+permissions:
+  contents: read
+jobs:
+  image-editor:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check OCR image identity and metadata
+        run: python3 tests/test_image_edit_ocr.py
+      - name: Generate iOS test project
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate --spec tests/project.yml
+      - name: Run renderer pixel tests on iOS Simulator
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for group in d["devices"].values() for v in group if v["name"].startswith("iPhone")))')
+          xcodebuild -project tests/KayokoEditorTests.xcodeproj -scheme KayokoEditorTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -resultBundlePath build/ImageEditorTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO test
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-editor-test-results
+          path: build/ImageEditorTests.xcresult
+          if-no-files-found: ignore
