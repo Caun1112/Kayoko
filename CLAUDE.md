@@ -24,7 +24,14 @@ Kayoko 是 iOS 剪切板管理器（Theos 越狱插件）。本仓库是 mlgm �
 THEOS_PACKAGE_SCHEME=roothide make package FINALPACKAGE=1   # rootful 用空 scheme
 ```
 
-**Theos 要求**：Core / Preferences / updater 的源码无条件 `#import <roothide.h>` 并调用 `jbroot()`，所以即便打 rootless/rootful 包也需要带 roothide 头文件的 Theos（roothide 的 Theos fork；stock Theos 只有 `vendor/include/libroot.h`、`rootless.h`）。`-lroothide` 仅在 roothide scheme 下链接（各子项目 Makefile）。
+**越狱根路径**：所有 `jbroot()` 调用统一走 `Preferences/KayokoJailbreakPath.h`，它按 scheme 切换实现：
+
+- roothide：`#import <roothide.h>`，`jbroot()` 由 libroothide 提供，另外链 `-lroothide`（各子项目 Makefile 的 `ifeq ($(THEOS_PACKAGE_SCHEME),roothide)` 分支，同时定义 `THEOS_PACKAGE_SCHEME_ROOTHIDE=1`）。**需要 roothide 的 Theos fork**，它才提供 `vendor/include/roothide.h` 与 `vendor/lib/iphone/roothide/`。
+- rootless / rootful：`#import <rootless.h>`，`jbroot()` 内联包装 Theos 自带 libroot 的 `ROOT_PATH_NS()`（`rules.mk` 会自动加 `-lroot`，静态链入，无额外运行时依赖）。**stock Theos 即可**，不需要 roothide 工具链。
+
+即：打 rootless DEB 不再依赖 roothide 工具链；只有打 roothide 包才需要它。任何 target 都不要再直接 `#import <roothide.h>`。
+
+Theos 的 rootless 模块（`vendor/mod/rootless/package/deb.mk`）会强制把 `control` 里的 `Architecture` 改写成 `iphoneos-arm64` 并把文件铺到 `var/jb/…`，所以 `control` 里写的 `iphoneos-arm` 不影响 rootless 产物。
 
 Xcode 侧：`Kayoko.xcodeproj` 由 `xcodegen generate` 从 `project.yml` 生成，**不要手改 `project.pbxproj`**。`project.yml` 里 `KAYOKO_PACKAGE_SCHEME: roothide`、`THEOS: /opt/theos`、install name 写死为 `@loader_path/.jbroot/...`，即 Xcode 工程只对应 roothide 一种方案；三方案打包走 `build.sh`。
 
@@ -121,7 +128,7 @@ Helper 还负责焦点捕获/恢复和"待粘贴"状态机（Core 发 `helper.pa
 - 头文件用 `NS_ASSUME_NONNULL_BEGIN/END`；指定初始化器 + `init`/`new` 标 `NS_UNAVAILABLE`。
 - 常量统一 `static NSString *const kKayoko...`，枚举成员 `k` 前缀；所有共享常量放 `Preferences/KayokoPreferenceKeys.h`（含默认值，是唯一真源）、`KayokoNotificationKeys.h`、`KayokoSceneSettingKeys.h`，其他 target 靠 `-I../Preferences` 引用。
 - Hook 一律用 CaptainHook（`#define CHUseSubstrate`），每次 `CHLoadClass_`/`CHHook` 前先用 `Shared/KayokoHookValidation.h` 的 `KayokoHookMethodMatches` 校验方法签名，不匹配就跳过并打日志。私有类声明写在各自的 hook 文件里，不共享头文件。
-- 绝对路径一律 `jbroot()` 包一层，并在 `dispatch_once` 里懒解析；用户数据固定放 `/var/mobile/Library/com.mlgm.kayoko/`。
+- 绝对路径一律 `jbroot()` 包一层，并在 `dispatch_once` 里懒解析；用户数据固定放 `/var/mobile/Library/com.mlgm.kayoko/`。`jbroot()` 只从 `Preferences/KayokoJailbreakPath.h` 来，不要在别处 `#import <roothide.h>`。
 - 新增文件：放进已有的 `Manager/ Actions/ Controllers/ Coordinators/ Models/ Presentation/ Views/` 等目录即可（Makefile 和 `project.yml` 都用通配/目录引用），**但 `Updater/Makefile` 是逐个列文件的**，新增 updater 用到的文件必须手动加进去。
 
 ## 需要注意的同步点

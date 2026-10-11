@@ -22,7 +22,7 @@
 #import <ImageIO/ImageIO.h>
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 static NSTimeInterval const kKayokoPasteboardWriteConfirmationTimeout = 0.25;
 static NSTimeInterval const kKayokoSimulatedAutomaticPasteDelay = 0.2;

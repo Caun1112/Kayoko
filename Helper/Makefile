@@ -26,6 +26,7 @@ KayokoHelper_FRAMEWORKS += AudioToolbox
 KayokoHelper_LIBRARIES += substrate
 ifeq ($(THEOS_PACKAGE_SCHEME),roothide)
 KayokoHelper_LIBRARIES += roothide
+KayokoHelper_CFLAGS += -DTHEOS_PACKAGE_SCHEME_ROOTHIDE=1
 endif
 
 include $(THEOS)/makefiles/common.mk

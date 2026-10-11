@@ -14,7 +14,7 @@
 
 #import <Preferences/PSSpecifier.h>
 #import <UIKit/UIKit.h>
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 @interface NSConcreteNotification : NSNotification
 @end

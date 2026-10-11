@@ -1,5 +1,5 @@
 #import "KayokoFilterCatalog.h"
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 NSString *const kKayokoSearchTokenTypeCategory = @"category";
 NSString *const kKayokoSearchTokenTypeApp = @"app";

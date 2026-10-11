@@ -29,6 +29,7 @@ kayoko_updater_FRAMEWORKS += UIKit
 kayoko_updater_LIBRARIES += sqlite3
 ifeq ($(THEOS_PACKAGE_SCHEME),roothide)
 kayoko_updater_LIBRARIES += roothide
+kayoko_updater_CFLAGS += -DTHEOS_PACKAGE_SCHEME_ROOTHIDE=1
 endif
 
 kayoko_updater_INSTALL_PATH := /usr/local/libexec

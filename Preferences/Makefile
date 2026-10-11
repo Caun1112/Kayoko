@@ -38,6 +38,7 @@ KayokoPreferences_PRIVATE_FRAMEWORKS += SpringBoardServices
 
 ifeq ($(THEOS_PACKAGE_SCHEME),roothide)
 KayokoPreferences_LIBRARIES += roothide
+KayokoPreferences_CFLAGS += -DTHEOS_PACKAGE_SCHEME_ROOTHIDE=1
 endif
 
 KayokoPreferences_INSTALL_PATH := /Library/PreferenceBundles

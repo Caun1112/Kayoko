@@ -19,7 +19,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import <math.h>
 #import <notify.h>
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 static NSTimeInterval const kKayokoMinimumFeedbackInterval = 0.6;
 static NSTimeInterval const kKayokoPasteSuppressionExpirationDelay = 1.0;

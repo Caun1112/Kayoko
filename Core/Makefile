@@ -41,6 +41,7 @@ KayokoCore_LIBRARIES += sqlite3
 KayokoCore_LIBRARIES += substrate
 ifeq ($(THEOS_PACKAGE_SCHEME),roothide)
 KayokoCore_LIBRARIES += roothide
+KayokoCore_CFLAGS += -DTHEOS_PACKAGE_SCHEME_ROOTHIDE=1
 endif
 
 include $(THEOS)/makefiles/common.mk

@@ -12,7 +12,7 @@
 
 #import <Preferences/PSSpecifier.h>
 #import <UIKit/UIKit.h>
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 static NSString *const kKayokoDataDirectoryPath = @"/var/mobile/Library/com.mlgm.kayoko";
 static NSString *const kKayokoCopyLogDataDirectoryPath = @"/var/mobile/Library/CopyLog";

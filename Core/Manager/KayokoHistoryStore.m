@@ -11,7 +11,7 @@
 #import <ImageIO/ImageIO.h>
 #import <limits.h>
 #import <math.h>
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 #import <sqlite3.h>
 #import <string.h>
 

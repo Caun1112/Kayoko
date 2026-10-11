@@ -6,7 +6,7 @@
 #import "KayokoTagStore.h"
 #import "KayokoTag.h"
 
-#import <roothide.h>
+#import "KayokoJailbreakPath.h"
 
 NSString *const kKayokoTagStoreErrorDomain = @"com.mlgm.kayoko.tag-store";
 
