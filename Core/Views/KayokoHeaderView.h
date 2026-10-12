@@ -28,6 +28,8 @@ static CGFloat const kKayokoHeaderContentSpacing = 4;
 @property(nonatomic, strong, readonly) UIButton *shareButton;
 @property(nonatomic, strong, readonly) UISegmentedControl *historySegmentedControl;
 @property(nonatomic, assign, getter=isHistorySwitcherVisible) BOOL historySwitcherVisible;
+/// Opt-in for image previews; preserves the existing button and its targets.
+@property(nonatomic, assign) BOOL leadingButtonOnTrailingSide;
 
 + (CGFloat)preferredHeight;
 - (instancetype)initWithTitle:(NSString *)title NS_DESIGNATED_INITIALIZER;

@@ -9,7 +9,6 @@
 #import "KayokoHeaderView.h"
 #import "KayokoActivitySharePresenter.h"
 #import "KayokoHistoryItemActionHandler.h"
-#import "KayokoImageEditPresenter.h"
 #import "KayokoFingerEditorViewController.h"
 #import "KayokoPasteboardItem.h"
 #import "KayokoPasteboardManager.h"
@@ -39,7 +38,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) KayokoHistoryItemActionHandler *actionHandler;
 @property(nonatomic, strong) KayokoActivitySharePresenter *activitySharePresenter;
 @property(nonatomic, strong) KayokoTextActionPresenter *textActionPresenter;
-@property(nonatomic, strong) KayokoImageEditPresenter *imageEditPresenter;
 @property(nonatomic, strong, nullable) KayokoFingerEditorViewController *fingerEditor;
 @property(nonatomic, assign) BOOL imageRestoreAvailable;
 @property(nonatomic, assign) BOOL imageRestoreInProgress;
@@ -67,7 +65,6 @@ NS_ASSUME_NONNULL_END
         _actionHandler = [[KayokoHistoryItemActionHandler alloc] init];
         _activitySharePresenter = [[KayokoActivitySharePresenter alloc] init];
         _textActionPresenter = [[KayokoTextActionPresenter alloc] init];
-        _imageEditPresenter = [[KayokoImageEditPresenter alloc] init];
         [[[_previewView headerView] translationButton] addTarget:self
             action:@selector(handleTranslationButtonPressed) forControlEvents:UIControlEventTouchUpInside];
         [[[_previewView headerView] bookButton] addTarget:self
@@ -111,6 +108,7 @@ NS_ASSUME_NONNULL_END
     [headerView setHidden:NO];
     [headerView setHistorySwitcherVisible:NO animated:NO];
     [headerView setTitleText:@""];
+    headerView.leadingButtonOnTrailingSide = item.imageName.length > 0;
     [headerView updateStyleForButton:[headerView leadingButton]
                        withImageName:@"arrowshape.turn.up.backward"
                            imageSize:kKayokoFavoritesButtonImageSize
@@ -244,7 +242,7 @@ NS_ASSUME_NONNULL_END
         setAccessibilityLabel:[[KayokoPasteboardManager localizationBundle] localizedStringForKey:@"Edit"
                                                                                             value:nil
                                                                                             table:@"Tweak"]];
-    [self setEditButtonHidden:NO];
+    [self setEditButtonHidden:self.previewItem.imageName.length > 0];
     UIButton *toolsButton = headerView.imageToolsButton;
     [headerView updateStyleForButton:toolsButton withImageName:@"slider.horizontal.3"
                           imageSize:kKayokoBackButtonImageSize tintColor:UIColor.labelColor];
@@ -267,7 +265,7 @@ NS_ASSUME_NONNULL_END
 
 - (void)setEditButtonEnabled:(BOOL)enabled {
     UIButton *editButton = [[[self previewView] headerView] editButton];
-    [editButton setEnabled:enabled];
+    [editButton setEnabled:enabled && !editButton.hidden];
     [editButton setAlpha:(enabled && ![editButton isHidden]) ? 1.0 : 0.35];
     UIButton *toolsButton = self.previewView.headerView.imageToolsButton;
     toolsButton.enabled = enabled && !toolsButton.hidden;
@@ -281,7 +279,7 @@ NS_ASSUME_NONNULL_END
 }
 
 - (void)handleEditButtonPressed {
-    if (![self canEditPreviewItem] || self.imageRestoreInProgress) {
+    if (![self canEditPreviewItem] || self.imageRestoreInProgress || self.previewItem.imageName.length > 0) {
         return;
     }
 
@@ -292,40 +290,6 @@ NS_ASSUME_NONNULL_END
 
     [self setEditButtonEnabled:NO];
     [[self delegate] previewViewControllerDidRequestEdit:self];
-}
-
-- (void)beginImageEditing {
-    KayokoPasteboardItem *item = [self previewItem];
-    NSString *historyKey = [self sourceHistoryKey];
-    if ([[item imageName] length] == 0 || [historyKey length] == 0 || [[self previewView] isHidden]) {
-        [self setEditButtonEnabled:YES];
-        return;
-    }
-
-    NSUInteger generation = self.previewGeneration;
-    __weak typeof(self) weakSelf = self;
-    BOOL presented = [[self imageEditPresenter]
-        presentImageForItem:item
-        sourceHistoryKey:historyKey
-        fromController:[self parentViewController] ?: self
-        completion:^(KayokoPasteboardItem *updatedItem) {
-          __strong typeof(weakSelf) strongSelf = weakSelf;
-          if (!strongSelf || strongSelf.previewGeneration != generation || [strongSelf previewItem] != item ||
-              [[strongSelf previewView] isHidden]) {
-              return;
-          }
-          if (updatedItem) {
-              [strongSelf showPreviewWithItem:updatedItem sourceHistoryKey:historyKey];
-          } else {
-              [strongSelf setEditButtonEnabled:YES];
-          }
-          [[strongSelf delegate] previewViewControllerDidFinishImageEditing:strongSelf];
-        }];
-    if (!presented) {
-        [self setEditButtonEnabled:YES];
-    } else if ([self hapticFeedbackHandler]) {
-        [self hapticFeedbackHandler](UIImpactFeedbackStyleLight);
-    }
 }
 
 - (void)handleImageToolsButtonPressed {
@@ -383,7 +347,6 @@ NS_ASSUME_NONNULL_END
 
 - (void)dismissImageEditing {
     self.previewGeneration++;
-    [[self imageEditPresenter] dismissEditingAnimated:NO];
     KayokoFingerEditorViewController *editor = self.fingerEditor;
     self.fingerEditor = nil;
     [editor invalidate];
@@ -450,7 +413,7 @@ NS_ASSUME_NONNULL_END
 - (void)handleRestoreImageButtonPressed {
     UIViewController *presenter = self.parentViewController ?: self;
     if (!self.imageRestoreAvailable || self.imageRestoreInProgress || self.previewView.hidden ||
-        self.fingerEditor || [self.imageEditPresenter shouldSuppressExternalHideRequest] || !presenter.viewIfLoaded.window ||
+        self.fingerEditor || !presenter.viewIfLoaded.window ||
         presenter.presentedViewController || presenter.isBeingPresented || presenter.isBeingDismissed) return;
 
     KayokoPasteboardItem *item = self.previewItem;
@@ -610,7 +573,7 @@ NS_ASSUME_NONNULL_END
 }
 
 - (BOOL)shouldSuppressExternalHideRequest {
-    return self.fingerEditor != nil || self.imageRestoreInProgress || [[self imageEditPresenter] shouldSuppressExternalHideRequest] ||
+    return self.fingerEditor != nil || self.imageRestoreInProgress ||
            [[self textActionPresenter] shouldSuppressExternalHideRequest];
 }
 

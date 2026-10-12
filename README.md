@@ -4,6 +4,13 @@ Feature-rich clipboard manager for iOS.
 
 A Kayoko fork maintained by **mlgm**, based on the [OwnGoal Studio edition](https://github.com/OwnGoalStudio/Kayoko).
 
+## 5.0.5 图片编辑与预览修复
+
+- 移除旧的系统简单图片编辑入口，图片预览只保留内置 FingerEditor、分享、保存、恢复原图（可用时）和返回。
+- 图片预览的返回按钮移到最右侧；文字预览仍可编辑，返回位置保持原有布局。
+- 松手后保留笔迹预览，渲染和快照写入完成时无动画替换为新图片，避免笔迹先消失再出现。
+- 每笔绘制不再使工具栏变暗或闪现加载指示；保存、打开图片和 OCR 等耗时操作仍显示处理状态。
+
 ## 5.0.4 单手编辑布局
 
 内置编辑器按 FingerEditor 的单手排版调整：上方只保留图片画布，下方依次为工具设置卡片、标注／遮盖／OCR／裁剪模式，以及图标操作栏。工具分组、颜色圆点、独立线宽数值、浅色圆角卡片和靠右排列均参考原 App。
@@ -15,7 +22,7 @@ A Kayoko fork maintained by **mlgm**, based on the [OwnGoal Studio edition](http
 
 ## 内置图片工具
 
-长按图片进入预览，点击原“编辑”右侧的滑杆图标，即可打开内置 **FingerEditor**。无需另外安装 App；原来的系统标记编辑入口继续保留。
+长按图片进入预览，点击滑杆图标，即可打开内置 **FingerEditor**，无需另外安装 App。
 
 - 标注：箭头、方框、圆框、文字、涂鸦。
 - 遮盖：细／粗马赛克画笔、模糊、纯色遮盖、矩形马赛克、从照片导入覆盖图片。

@@ -26,6 +26,7 @@ static NSError *KayokoFingerError(NSString *key) {
 @property(nonatomic, copy, nullable) void (^saveHandler)(NSURL *, void (^)(NSError *_Nullable));
 @property(nonatomic, copy, nullable) void (^didFinish)(BOOL);
 @property(nonatomic) BOOL busy;
+@property(nonatomic) BOOL quietProcessing;
 @property(nonatomic) BOOL saving;
 @property(nonatomic) BOOL invalidated;
 @property(nonatomic, strong) KayokoFingerCanvasView *canvas;
@@ -193,11 +194,21 @@ static NSError *KayokoFingerError(NSString *key) {
 
 - (void)setProcessing:(BOOL)processing {
     self.busy = processing;
-    processing ? [self.spinner startAnimating] : [self.spinner stopAnimating];
+    if (!processing) self.quietProcessing = NO;
+    (processing && !self.quietProcessing) ? [self.spinner startAnimating] : [self.spinner stopAnimating];
     [self updateControls];
 }
 
 - (void)updateControls {
+    if (self.busy && self.quietProcessing) {
+        // Serialize the edit without changing alpha, enabled appearance or
+        // progress indicators on every finger-up.
+        self.canvas.userInteractionEnabled = NO;
+        self.controls.userInteractionEnabled = NO;
+        self.lockButton.userInteractionEnabled = NO;
+        return;
+    }
+    self.lockButton.userInteractionEnabled = YES;
     BOOL ready = !self.busy && !self.invalidated && self.snapshots.count > 0;
     self.canvas.userInteractionEnabled = ready;
     self.controls.userInteractionEnabled = !self.busy && !self.invalidated;
@@ -323,13 +334,14 @@ static NSError *KayokoFingerError(NSString *key) {
 }
 
 - (void)applyOperation:(KayokoFingerEditOperation *)operation {
-    if (self.busy || self.invalidated || !self.canvas.image) return;
+    if (self.busy || self.invalidated || !self.canvas.image) { [self.canvas cancelPendingOperation]; return; }
     KayokoFingerEditOperation *edit = [operation copy];
     if (edit.tool == kKayokoFingerToolSticker) {
-        if (!self.stickerImage) { [self chooseSticker]; return; }
+        if (!self.stickerImage) { [self.canvas cancelPendingOperation]; [self chooseSticker]; return; }
         edit.stickerImage = self.stickerImage;
     }
     UIImage *input = self.canvas.image;
+    self.quietProcessing = YES;
     [self setProcessing:YES];
     dispatch_async(self.processingQueue, ^{
         @autoreleasepool {
@@ -339,11 +351,15 @@ static NSError *KayokoFingerError(NSString *key) {
             BOOL written = data.length && [data writeToURL:URL options:NSDataWritingAtomic error:nil];
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (self.invalidated) return;
-                [self setProcessing:NO];
-                if (!written) { [self showError:KayokoFingerError(@"Unable to Apply Edit")]; return; }
+                if (!written) {
+                    [self.canvas cancelPendingOperation];
+                    [self setProcessing:NO];
+                    [self showError:KayokoFingerError(@"Unable to Apply Edit")];
+                    return;
+                }
                 [self appendSnapshotURL:URL image:result];
                 [self setStatusText:@"Image Edited"];
-                [self updateControls];
+                [self setProcessing:NO];
             });
         }
     });
@@ -566,6 +582,7 @@ static NSError *KayokoFingerError(NSString *key) {
     self.invalidated = YES;
     self.didFinish = nil;
     self.saveHandler = nil;
+    [self.canvas cancelPendingOperation];
     self.canvas.operationHandler = nil;
     self.canvas.textPositionHandler = nil;
     self.canvas.userInteractionEnabled = NO;

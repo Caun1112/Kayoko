@@ -26,6 +26,9 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
 @property(nonatomic, strong, readwrite) UIButton *editButton;
 @property(nonatomic, strong, readwrite) UIButton *imageToolsButton;
 @property(nonatomic, strong) UIStackView *trailingButtonStack;
+@property(nonatomic, strong) NSLayoutConstraint *leadingButtonLeftConstraint;
+@property(nonatomic, strong) NSLayoutConstraint *leadingButtonRightConstraint;
+@property(nonatomic, strong) NSLayoutConstraint *trailingStackTrailingConstraint;
 @property(nonatomic, copy) NSArray<NSLayoutConstraint *> *trailingButtonWidthConstraints;
 @property(nonatomic, strong, readwrite) UIButton *trailingButton;
 @property(nonatomic, strong, readwrite) UIButton *alternateTrailingButton;
@@ -171,6 +174,11 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
         [self addSubview:_titleTapControl];
         [_titleTapControl setTranslatesAutoresizingMaskIntoConstraints:NO];
 
+        _leadingButtonLeftConstraint = [_leadingButton.centerXAnchor constraintEqualToAnchor:self.leadingAnchor
+            constant:kKayokoLeadingHeaderButtonCenterXInset];
+        _leadingButtonRightConstraint = [_leadingButton.centerXAnchor constraintEqualToAnchor:self.trailingAnchor
+            constant:-kKayokoLeadingHeaderButtonCenterXInset];
+        _trailingStackTrailingConstraint = [_trailingButtonStack.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-16];
         [NSLayoutConstraint activateConstraints:@[
             [[_grabber topAnchor] constraintEqualToAnchor:[self topAnchor] constant:kKayokoGrabberTopInset],
             [[_grabber centerXAnchor] constraintEqualToAnchor:[self centerXAnchor]],
@@ -179,8 +187,7 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
 
             [[_leadingButton bottomAnchor] constraintEqualToAnchor:[self bottomAnchor]
                                                           constant:-kKayokoSegmentBottomInset],
-            [[_leadingButton centerXAnchor] constraintEqualToAnchor:[self leadingAnchor]
-                                                           constant:kKayokoLeadingHeaderButtonCenterXInset],
+            _leadingButtonLeftConstraint,
             [[_leadingButton topAnchor] constraintGreaterThanOrEqualToAnchor:[_grabber bottomAnchor] constant:8],
 
             [[_titleLabel centerYAnchor] constraintEqualToAnchor:[_leadingButton centerYAnchor]],
@@ -193,7 +200,7 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
             [[_historySegmentedControl heightAnchor] constraintEqualToConstant:kKayokoHistorySegmentHeight],
 
             [[_trailingButtonStack centerYAnchor] constraintEqualToAnchor:[_leadingButton centerYAnchor]],
-            [[_trailingButtonStack trailingAnchor] constraintEqualToAnchor:[self trailingAnchor] constant:-16],
+            _trailingStackTrailingConstraint,
             [[_trailingButtonStack heightAnchor] constraintEqualToConstant:32],
             [[_titleLabel trailingAnchor] constraintLessThanOrEqualToAnchor:[_trailingButtonStack leadingAnchor]
                                                                       constant:-kKayokoTitleTapControlTrailingSpacing],
@@ -215,7 +222,8 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
     for (UIView *button in [[self trailingButtonStack] arrangedSubviews]) {
         if (![button isHidden]) visibleCount++;
     }
-    CGFloat availableWidth = CGRectGetWidth([self bounds]) - 16 - kKayokoTitleLabelLeadingInset -
+    CGFloat rightInset = self.leadingButtonOnTrailingSide ? 64 : 16;
+    CGFloat availableWidth = CGRectGetWidth([self bounds]) - rightInset - kKayokoTitleLabelLeadingInset -
                              kKayokoTitleTapControlTrailingSpacing;
     CGFloat buttonWidth = visibleCount > 0 ? MIN(32, MAX(0, availableWidth) / visibleCount) : 32;
     for (NSLayoutConstraint *constraint in [self trailingButtonWidthConstraints]) {
@@ -225,6 +233,15 @@ static CGFloat const kKayokoSegmentBottomInset = 10;
         MAX(0, MIN(12, (availableWidth - visibleCount * buttonWidth) / (visibleCount - 1))) : 12;
     [[self trailingButtonStack] setSpacing:spacing];
     [super layoutSubviews];
+}
+
+- (void)setLeadingButtonOnTrailingSide:(BOOL)right {
+    if (_leadingButtonOnTrailingSide == right) return;
+    _leadingButtonOnTrailingSide = right;
+    [NSLayoutConstraint deactivateConstraints:@[self.leadingButtonLeftConstraint, self.leadingButtonRightConstraint]];
+    (right ? self.leadingButtonRightConstraint : self.leadingButtonLeftConstraint).active = YES;
+    self.trailingStackTrailingConstraint.constant = right ? -64 : -16;
+    [self setNeedsLayout];
 }
 
 - (void)setTitleText:(NSString *)title {

@@ -46,3 +46,10 @@ Device acceptance checklist (not covered by compilation):
 - Force-close the panel/lock during processing; reopen another image and verify no
   late callback changes its preview. A failed save must keep edits available to retry.
 - Test small-screen portrait and landscape, iOS 14 and iOS 16, plus a large photo.
+
+5.0.5 regressions hold the real processing queue after finger-up and compare rendered
+canvas/toolbar pixels before and during the pending commit, then verify the raster
+handoff, zoom preservation and failure recovery. Real image/text preview tests check
+that only the new image editor remains, Back is rightmost for images, and text editing
+and its original Back placement still work. CI attaches stroke-before/pending/after
+and image-preview screenshots.

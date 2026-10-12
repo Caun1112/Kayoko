@@ -26,6 +26,13 @@ targets:
       - KayokoFingerEditorLayoutTests.m
       - KayokoEditorRuntimeStubs.m
       - ../Core/Controllers/KayokoFingerEditorViewController.m
+      - ../Core/Controllers/KayokoPreviewViewController.m
+      - ../Core/Views/KayokoPreviewView.m
+      - ../Core/Views/KayokoHeaderView.m
+      - ../Core/Views/KayokoGrabberView.m
+      - ../Core/Views/KayokoEdgeFadingTextView.m
+      - ../Core/Views/KayokoEdgeFadeMaskController.m
+      - ../Core/Manager/KayokoPasteboardItem.m
       - ../Core/Views/KayokoFingerCanvasView.m
       - ../Core/Views/KayokoFingerEditorControlsView.m
       - ../Core/Models/KayokoFingerImageRenderer.m
@@ -51,6 +58,7 @@ targets:
           - $(SRCROOT)/../Core/Views
           - $(SRCROOT)/../Core/Models
           - $(SRCROOT)/../Core/Manager
+          - $(SRCROOT)/../Core/Actions
 schemes:
   KayokoEditorTests:
     build:

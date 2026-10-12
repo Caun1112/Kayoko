@@ -19,6 +19,7 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
 @property(nonatomic, assign) CGFloat drawingWidth;
 @property(nonatomic, assign) CGSize layoutSize;
 @property(nonatomic, assign) BOOL needsFit;
+@property(nonatomic) BOOL hasPendingOperation;
 @end
 
 @implementation KayokoFingerCanvasView
@@ -88,9 +89,15 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
 - (void)setImage:(UIImage *)image {
     CGSize oldSize = CGSizeMake(_image.size.width * _image.scale, _image.size.height * _image.scale);
     CGSize newSize = CGSizeMake(image.size.width * image.scale, image.size.height * image.scale);
+    // Publish the raster and remove its vector overlay in one non-animated
+    // transaction. There must never be a frame containing neither of them.
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
     _image = image;
     self.imageView.image = image;
+    self.hasPendingOperation = NO;
     [self clearPreview];
+    [CATransaction commit];
     if (!CGSizeEqualToSize(oldSize, newSize)) {
         self.needsFit = YES;
         [self setNeedsLayout];
@@ -141,7 +148,9 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
         CGPoint oldCenter = CGPointMake(CGRectGetMidX(self.scrollView.bounds), CGRectGetMidY(self.scrollView.bounds));
         normalizedCenter = [self normalizedPoint:[self.imageView convertPoint:oldCenter fromView:self.scrollView]];
     }
-    [self clearPreview];
+    // A rotation/layout pass must not erase an edit still being rendered.
+    if (!self.hasPendingOperation) [self clearPreview];
+    CGFloat oldImageWidth = self.imageView.bounds.size.width;
     self.scrollView.frame = self.bounds;
     self.layoutSize = viewport;
     if (!self.image || viewport.width <= 0 || viewport.height <= 0 ||
@@ -157,6 +166,10 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
     self.scrollView.zoomScale = 1.0;
     self.imageView.frame = (CGRect){CGPointZero, baseSize};
     self.previewLayer.frame = self.imageView.bounds;
+    if (self.hasPendingOperation && oldImageWidth > 0) {
+        self.drawingWidth *= baseSize.width / oldImageWidth;
+        [self rebuildPreview];
+    }
     self.scrollView.contentSize = baseSize;
     self.scrollView.zoomScale = MIN(kKayokoFingerMaximumZoom, MAX(1.0, zoom));
     [self centerImage];
@@ -193,7 +206,7 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
 }
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
-    if (self.navigationMode || !self.image || self.scrollView.isZooming || self.scrollView.isDragging) return NO;
+    if (self.hasPendingOperation || self.navigationMode || !self.image || self.scrollView.isZooming || self.scrollView.isDragging) return NO;
     if (gestureRecognizer == self.drawingGesture && self.tool == kKayokoFingerToolText) return NO;
     return YES;
 }
@@ -223,6 +236,7 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
 }
 
 - (void)beginStrokeAtPoint:(CGPoint)point {
+    if (self.hasPendingOperation) return;
     self.drawingTool = self.tool;
     self.drawingColor = self.strokeColor;
     self.drawingWidth = MAX(1.0, self.strokeWidth) / MAX(1.0, self.scrollView.zoomScale);
@@ -245,6 +259,7 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
                self.drawingTool == kKayokoFingerToolBlur) {
         self.previewLayer.strokeColor = [[UIColor systemGrayColor] colorWithAlphaComponent:0.65].CGColor;
     }
+    [self rebuildPreview];
 }
 
 - (void)handleDrawing:(UIPanGestureRecognizer *)gesture {
@@ -282,45 +297,56 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
 }
 
 - (void)appendPoint:(CGPoint)point {
-    if (!self.drawingPoints) return;
+    if (!self.drawingPoints || self.hasPendingOperation) return;
     CGPoint normalized = [self normalizedPoint:point];
-    CGPoint clamped = [self displayPoint:normalized];
     if ([self isBrushTool:self.drawingTool]) {
         CGPoint previous = [self displayPoint:self.drawingPoints.lastObject.CGPointValue];
-        if (hypot(clamped.x - previous.x, clamped.y - previous.y) * self.scrollView.zoomScale < 0.5) return;
+        CGPoint current = [self displayPoint:normalized];
+        if (hypot(current.x - previous.x, current.y - previous.y) * self.scrollView.zoomScale < 0.5) return;
         [self.drawingPoints addObject:[NSValue valueWithCGPoint:normalized]];
-        [self.brushPreviewPath addLineToPoint:clamped];
+        [self.brushPreviewPath addLineToPoint:current];
         self.previewLayer.path = self.brushPreviewPath.CGPath;
         return;
-    }
-    if (self.drawingPoints.count == 1) [self.drawingPoints addObject:[NSValue valueWithCGPoint:normalized]];
-    else self.drawingPoints[1] = [NSValue valueWithCGPoint:normalized];
-    CGPoint start = [self displayPoint:self.drawingPoints.firstObject.CGPointValue];
-    CGRect rect = CGRectMake(MIN(start.x, clamped.x), MIN(start.y, clamped.y),
-                             fabs(start.x - clamped.x), fabs(start.y - clamped.y));
-    UIBezierPath *path;
-    if (self.drawingTool == kKayokoFingerToolArrow) {
-        path = [UIBezierPath bezierPath];
-        [path moveToPoint:start];
-        [path addLineToPoint:clamped];
-        CGFloat angle = atan2(clamped.y - start.y, clamped.x - start.x);
-        CGFloat head = MIN(hypot(clamped.x - start.x, clamped.y - start.y) * 0.45,
-                           MAX(12.0 / self.scrollView.zoomScale, self.drawingWidth * 3.0));
-        [path moveToPoint:CGPointMake(clamped.x - head * cos(angle - M_PI / 6.0),
-                                     clamped.y - head * sin(angle - M_PI / 6.0))];
-        [path addLineToPoint:clamped];
-        [path addLineToPoint:CGPointMake(clamped.x - head * cos(angle + M_PI / 6.0),
-                                        clamped.y - head * sin(angle + M_PI / 6.0))];
-    } else if (self.drawingTool == kKayokoFingerToolEllipse) {
-        path = [UIBezierPath bezierPathWithOvalInRect:rect];
+    } else if (self.drawingPoints.count == 1) {
+        [self.drawingPoints addObject:[NSValue valueWithCGPoint:normalized]];
     } else {
-        path = [UIBezierPath bezierPathWithRect:rect];
+        self.drawingPoints[1] = [NSValue valueWithCGPoint:normalized];
     }
+    [self rebuildPreview];
+}
+
+- (void)rebuildPreview {
+    if (!self.drawingPoints.count) return;
+    CGPoint start = [self displayPoint:self.drawingPoints.firstObject.CGPointValue];
+    CGPoint end = [self displayPoint:self.drawingPoints.lastObject.CGPointValue];
+    UIBezierPath *path = [UIBezierPath bezierPath];
+    self.previewLayer.lineWidth = self.drawingWidth;
+    if ([self isBrushTool:self.drawingTool]) {
+        [path moveToPoint:start];
+        for (NSValue *value in self.drawingPoints) [path addLineToPoint:[self displayPoint:value.CGPointValue]];
+        // A zero-length CAShapeLayer path is invisible; match the renderer's dot.
+        if (self.drawingPoints.count == 1) [path addLineToPoint:CGPointMake(start.x + 0.01, start.y)];
+    } else if (self.drawingTool == kKayokoFingerToolArrow) {
+        [path moveToPoint:start];
+        [path addLineToPoint:end];
+        CGFloat angle = atan2(end.y - start.y, end.x - start.x);
+        CGFloat pixelsPerPoint = self.image.size.width * self.image.scale / MAX(1, self.imageView.bounds.size.width);
+        CGFloat head = MIN(MAX(16 / pixelsPerPoint, self.drawingWidth * 4.2), hypot(end.x - start.x, end.y - start.y) * 0.6);
+        [path moveToPoint:CGPointMake(end.x - head * cos(angle - M_PI / 7), end.y - head * sin(angle - M_PI / 7))];
+        [path addLineToPoint:end];
+        [path addLineToPoint:CGPointMake(end.x - head * cos(angle + M_PI / 7), end.y - head * sin(angle + M_PI / 7))];
+    } else {
+        CGRect rect = CGRectMake(MIN(start.x, end.x), MIN(start.y, end.y), fabs(end.x-start.x), fabs(end.y-start.y));
+        path = self.drawingTool == kKayokoFingerToolEllipse ? [UIBezierPath bezierPathWithOvalInRect:rect] :
+            [UIBezierPath bezierPathWithRect:rect];
+        if (self.drawingTool == kKayokoFingerToolCrop) self.previewLayer.lineWidth = 2 / MAX(1, self.scrollView.zoomScale);
+    }
+    self.brushPreviewPath = path;
     self.previewLayer.path = path.CGPath;
 }
 
 - (void)finishStroke {
-    if (!self.drawingPoints.count) return;
+    if (!self.drawingPoints.count || self.hasPendingOperation) return;
     if (![self isBrushTool:self.drawingTool]) {
         CGPoint start = [self displayPoint:self.drawingPoints.firstObject.CGPointValue];
         CGPoint end = [self displayPoint:self.drawingPoints.lastObject.CGPointValue];
@@ -339,11 +365,18 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
     operation.color = self.drawingColor ?: self.strokeColor;
     operation.lineWidth = self.drawingWidth * (self.image.size.width * self.image.scale) /
                           MAX(1.0, self.imageView.bounds.size.width);
+    if (!self.operationHandler) { [self clearPreview]; return; }
+    self.hasPendingOperation = YES;
+    self.operationHandler(operation);
+}
+
+- (void)cancelPendingOperation {
+    self.hasPendingOperation = NO;
     [self clearPreview];
-    if (self.operationHandler) self.operationHandler(operation);
 }
 
 - (void)clearPreview {
+    if (self.hasPendingOperation) return;
     self.drawingPoints = nil;
     self.brushPreviewPath = nil;
     self.previewLayer.path = nil;

@@ -32,7 +32,6 @@ KayokoCore_FRAMEWORKS += CoreImage
 KayokoCore_FRAMEWORKS += ImageIO
 KayokoCore_FRAMEWORKS += IOKit
 KayokoCore_FRAMEWORKS += QuartzCore
-KayokoCore_FRAMEWORKS += QuickLook
 KayokoCore_FRAMEWORKS += PhotosUI
 KayokoCore_FRAMEWORKS += Security
 KayokoCore_FRAMEWORKS += UIKit

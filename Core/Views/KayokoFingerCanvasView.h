@@ -16,6 +16,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, copy, nullable) void (^operationHandler)(KayokoFingerEditOperation *operation);
 @property(nonatomic, copy, nullable) void (^textPositionHandler)(CGPoint normalizedPosition);
 
+/// Remains YES between finger-up and the atomic image/preview handoff.
+@property(nonatomic, readonly) BOOL hasPendingOperation;
+- (void)cancelPendingOperation;
 - (void)resetZoom;
 
 @end

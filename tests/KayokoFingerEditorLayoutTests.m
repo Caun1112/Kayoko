@@ -4,6 +4,16 @@
 #import "KayokoFingerEditorViewController.h"
 #import "KayokoFingerEditorControlsView.h"
 #import "KayokoFingerCanvasView.h"
+#import "KayokoPreviewViewController.h"
+#import "KayokoPreviewView.h"
+#import "KayokoHeaderView.h"
+#import "KayokoPasteboardItem.h"
+
+@interface KayokoFingerCanvasView (StrokeTestEntryPoints)
+- (void)beginStrokeAtPoint:(CGPoint)point;
+- (void)appendPoint:(CGPoint)point;
+- (void)finishStroke;
+@end
 
 // Keep the real controller's lifecycle/layout, while making safe areas and
 // device dimensions deterministic on whichever simulator GitHub provides.
@@ -369,6 +379,127 @@
     [self waitUntilIdle:editor];
     XCTAssertEqualObjects(UIImagePNGRepresentation(canvas.image), original, @"Original file must survive branch deletion");
     [editor invalidate];
+}
+
+- (NSData *)pixelsForView:(UIView *)view {
+    UIGraphicsImageRendererFormat *format = [[UIGraphicsImageRendererFormat alloc] init];
+    format.scale = 1;
+    UIImage *image = [[[UIGraphicsImageRenderer alloc] initWithSize:view.bounds.size format:format]
+        imageWithActions:^(UIGraphicsImageRendererContext *context) { [view.layer renderInContext:context.CGContext]; }];
+    return UIImagePNGRepresentation(image);
+}
+
+- (void)testFingerUpKeepsStrokeAndToolbarStableUntilRasterIsReady {
+    UIViewController *host = [[UIViewController alloc] init];
+    KayokoTestEditorController *editor = [self editorInHost:host size:CGSizeMake(430, 932)
+                                                  insets:UIEdgeInsetsMake(59, 0, 34, 0)];
+    KayokoFingerCanvasView *canvas = (id)[self find:@"finger.canvas" inView:editor.view];
+    KayokoFingerEditorControlsView *controls = (id)[self find:@"finger.controls" inView:editor.view];
+    UIActivityIndicatorView *spinner = [editor valueForKey:@"spinner"];
+    UIImageView *imageView = [canvas valueForKey:@"imageView"];
+    UIScrollView *scroll = [canvas valueForKey:@"scrollView"];
+    [scroll setZoomScale:2 animated:NO];
+    CGPoint previousOffset = scroll.contentOffset;
+    CGFloat zoom = scroll.zoomScale;
+    canvas.tool = kKayokoFingerToolPen;
+    UIImage *base = canvas.image;
+    NSData *blankPixels = [self pixelsForView:imageView];
+    dispatch_semaphore_t gate = dispatch_semaphore_create(0);
+    dispatch_queue_t queue = [editor valueForKey:@"processingQueue"];
+    dispatch_async(queue, ^{ dispatch_semaphore_wait(gate, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC)); });
+    @try {
+        [canvas beginStrokeAtPoint:CGPointMake(imageView.bounds.size.width * 0.3, imageView.bounds.size.height * 0.4)];
+        [canvas appendPoint:CGPointMake(imageView.bounds.size.width * 0.7, imageView.bounds.size.height * 0.6)];
+        NSData *drawing = [self pixelsForView:imageView];
+        XCTAssertNotEqualObjects(drawing, blankPixels);
+        NSData *toolbarBefore = [self pixelsForView:controls];
+        [self attachEditor:editor name:@"stroke-before-finger-up"];
+        [canvas finishStroke];
+        XCTAssertTrue(canvas.hasPendingOperation);
+        XCTAssertEqual(canvas.image, base, @"The processing queue is deliberately held");
+        XCTAssertEqualObjects(drawing, [self pixelsForView:imageView], @"No disappearing stroke at finger-up");
+        XCTAssertEqualObjects(toolbarBefore, [self pixelsForView:controls], @"No dimmed or disabled-looking toolbar flash");
+        XCTAssertFalse(spinner.animating);
+        XCTAssertEqualWithAccuracy(controls.alpha, 1, 0.001);
+        [self attachEditor:editor name:@"stroke-awaiting-raster"];
+    } @finally {
+        dispatch_semaphore_signal(gate);
+    }
+    [self waitUntilIdle:editor];
+    XCTAssertFalse(canvas.hasPendingOperation);
+    XCTAssertNotEqual(canvas.image, base);
+    XCTAssertTrue(((CAShapeLayer *)[canvas valueForKey:@"previewLayer"]).path == NULL);
+    XCTAssertNotEqualObjects([self pixelsForView:imageView], blankPixels);
+    XCTAssertEqualWithAccuracy(scroll.zoomScale, zoom, 0.001);
+    XCTAssertTrue(CGPointEqualToPoint(scroll.contentOffset, previousOffset));
+    XCTAssertTrue(canvas.userInteractionEnabled);
+    XCTAssertTrue(controls.userInteractionEnabled);
+    [self attachEditor:editor name:@"stroke-committed"];
+    [editor invalidate];
+}
+
+- (void)testFailedStrokeWriteClearsOverlayAndPreservesOriginal {
+    UIViewController *host = [[UIViewController alloc] init];
+    KayokoTestEditorController *editor = [self editorInHost:host size:CGSizeMake(375, 667)
+                                                  insets:UIEdgeInsetsMake(20, 0, 0, 0)];
+    KayokoFingerCanvasView *canvas = (id)[self find:@"finger.canvas" inView:editor.view];
+    UIImageView *imageView = [canvas valueForKey:@"imageView"];
+    UIImage *base = canvas.image;
+    NSURL *directory = [editor valueForKey:@"directoryURL"];
+    // Point future snapshot writes at a missing directory, without removing the current image.
+    [editor setValue:[directory URLByAppendingPathComponent:@"unavailable"] forKey:@"directoryURL"];
+    canvas.tool = kKayokoFingerToolPen;
+    [canvas beginStrokeAtPoint:CGPointMake(30, 30)];
+    [canvas appendPoint:CGPointMake(90, 90)];
+    [canvas finishStroke];
+    [self waitUntilIdle:editor];
+    XCTAssertEqual(canvas.image, base);
+    XCTAssertFalse(canvas.hasPendingOperation);
+    XCTAssertTrue(((CAShapeLayer *)[canvas valueForKey:@"previewLayer"]).path == NULL);
+    XCTAssertTrue(canvas.userInteractionEnabled);
+    XCTAssertFalse(((UIActivityIndicatorView *)[editor valueForKey:@"spinner"]).animating);
+    [editor setValue:directory forKey:@"directoryURL"];
+    [editor invalidate];
+    (void)imageView;
+}
+
+- (void)testImagePreviewHasOnlyNewEditorAndRightmostBackWhileTextKeepsEdit {
+    for (NSNumber *widthValue in @[@320, @430]) {
+        CGFloat width = widthValue.doubleValue;
+        KayokoPreviewViewController *preview = [[KayokoPreviewViewController alloc] init];
+        preview.view.frame = CGRectMake(0, 0, width, 600);
+        preview.view.backgroundColor = UIColor.secondarySystemBackgroundColor;
+        KayokoHeaderView *header = preview.previewView.headerView;
+        [NSLayoutConstraint activateConstraints:@[
+            [header.topAnchor constraintEqualToAnchor:preview.view.topAnchor],
+            [header.leadingAnchor constraintEqualToAnchor:preview.view.leadingAnchor],
+            [header.trailingAnchor constraintEqualToAnchor:preview.view.trailingAnchor]
+        ]];
+        KayokoPasteboardItem *image = [[KayokoPasteboardItem alloc] initWithBundleIdentifier:@"test"
+            andContent:self.imageURL.lastPathComponent withImageNamed:self.imageURL.lastPathComponent];
+        [preview showPreviewWithItem:image sourceHistoryKey:@"history"];
+        [preview.view layoutIfNeeded];
+        XCTAssertTrue(header.editButton.hidden, @"The retired simple image editor must not reappear");
+        XCTAssertFalse(header.editButton.enabled);
+        XCTAssertFalse(header.imageToolsButton.hidden);
+        XCTAssertTrue(header.imageToolsButton.enabled);
+        XCTAssertTrue(header.leadingButtonOnTrailingSide);
+        CGRect back = [header.leadingButton convertRect:header.leadingButton.bounds toView:header];
+        for (UIButton *button in @[header.imageToolsButton, header.shareButton, header.trailingButton]) {
+            CGRect action = [button convertRect:button.bounds toView:header];
+            XCTAssertLessThan(CGRectGetMaxX(action), CGRectGetMinX(back));
+        }
+        XCTAssertGreaterThan(CGRectGetMidX(back), width - 50);
+        [self attachEditor:preview name:[NSString stringWithFormat:@"image-preview-right-back-%.0f", width]];
+        KayokoPasteboardItem *text = [[KayokoPasteboardItem alloc] initWithBundleIdentifier:@"test" andContent:@"Editable text" withImageNamed:@""];
+        [preview showPreviewWithItem:text sourceHistoryKey:@"history"];
+        [preview.view layoutIfNeeded];
+        XCTAssertFalse(header.editButton.hidden);
+        XCTAssertTrue(header.editButton.enabled);
+        XCTAssertTrue(header.imageToolsButton.hidden);
+        XCTAssertFalse(header.leadingButtonOnTrailingSide);
+        XCTAssertLessThan(CGRectGetMidX(header.leadingButton.frame), 60);
+    }
 }
 
 @end

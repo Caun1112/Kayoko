@@ -5,6 +5,9 @@ on:
     paths:
       - 'Core/Models/KayokoFingerImageRenderer.*'
       - 'Core/Controllers/KayokoFingerEditorViewController.*'
+      - 'Core/Controllers/KayokoPreviewViewController.*'
+      - 'Core/Views/KayokoHeaderView.*'
+      - 'Core/Views/KayokoPreviewView.*'
       - 'Core/Views/KayokoFingerCanvasView.*'
       - 'Core/Views/KayokoFingerEditorControlsView.*'
       - 'Preferences/Resources/*/Tweak.strings'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'Core/Models/KayokoFingerImageRenderer.*'
       - 'Core/Controllers/KayokoFingerEditorViewController.*'
+      - 'Core/Controllers/KayokoPreviewViewController.*'
+      - 'Core/Views/KayokoHeaderView.*'
+      - 'Core/Views/KayokoPreviewView.*'
       - 'Core/Views/KayokoFingerCanvasView.*'
       - 'Core/Views/KayokoFingerEditorControlsView.*'
       - 'Preferences/Resources/*/Tweak.strings'

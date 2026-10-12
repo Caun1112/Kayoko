@@ -2199,8 +2199,7 @@ NS_ASSUME_NONNULL_END
         return;
     }
     if ([[item imageName] length] > 0) {
-        [self clearExternalHideCoordinator];
-        [controller beginImageEditing];
+        [controller setEditButtonEnabled:YES];
         return;
     }
 
