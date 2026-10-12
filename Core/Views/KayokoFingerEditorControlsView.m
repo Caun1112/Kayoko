@@ -292,8 +292,18 @@ static UIColor *KayokoFingerPanelColor(void) {
     return button;
 }
 
+- (CGFloat)settingsContentHeight {
+    if (self.selectedMode == 0) return 190;
+    if (self.selectedMode == 1) {
+        if (self.selectedTool == kKayokoFingerToolCover) return 142;
+        if (self.selectedTool == kKayokoFingerToolSticker) return 150;
+        return 100;
+    }
+    return self.selectedMode == 2 ? 120 : 88;
+}
+
 - (CGFloat)preferredHeight {
-    return self.compactLayout ? 246 : 320;
+    return self.compactLayout ? 246 : self.settingsContentHeight + 130;
 }
 
 - (CGSize)intrinsicContentSize {
@@ -321,7 +331,7 @@ static UIColor *KayokoFingerPanelColor(void) {
         card.layer.borderColor = [UIColor.separatorColor colorWithAlphaComponent:0.45].CGColor;
     }
     self.settingsScrollView.frame = self.settingsCard.bounds;
-    CGFloat contentHeight = MAX(190, settingsHeight);
+    CGFloat contentHeight = MAX(self.settingsContentHeight, settingsHeight);
     self.settingsContent.frame = CGRectMake(0, 0, width, contentHeight);
     self.settingsScrollView.contentSize = CGSizeMake(width, contentHeight);
     self.settingsScrollView.scrollEnabled = contentHeight > settingsHeight;
@@ -353,7 +363,7 @@ static UIColor *KayokoFingerPanelColor(void) {
     self.recognizeButton.frame = CGRectMake(panelX, 24, panelWidth, 44);
     self.importOverlayButton.frame = CGRectMake(panelX, 56, panelWidth, 44);
     CGFloat statusWidth = self.statusLabel.text.length ? MIN(102, width * 0.32) : 0;
-    CGFloat footerY = MAX(154, contentHeight - 36);
+    CGFloat footerY = contentHeight - 36;
     self.hintLabel.frame = CGRectMake(12, footerY, MAX(0, width - 24 - statusWidth - (statusWidth > 0 ? 8 : 0)), 28);
     self.statusLabel.frame = CGRectMake(width - 12 - statusWidth, footerY, statusWidth, 28);
     CGFloat modeWidth = MIN(288, MAX(0, width - 16));
@@ -402,6 +412,8 @@ static UIColor *KayokoFingerPanelColor(void) {
     self.recognizeButton.hidden = self.selectedMode != 2;
     self.importOverlayButton.hidden = !(mask && tool == kKayokoFingerToolSticker);
     if (modeChanged) self.settingsScrollView.contentOffset = CGPointZero;
+    [self invalidateIntrinsicContentSize];
+    [self.superview setNeedsLayout];
     [self setNeedsLayout];
 }
 

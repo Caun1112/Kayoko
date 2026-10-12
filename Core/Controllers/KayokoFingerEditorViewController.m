@@ -178,12 +178,17 @@ static NSError *KayokoFingerError(NSString *key) {
                 }
                 [self.snapshots addObject:URL];
                 self.originalSnapshotURL = URL;
-                self.controls.statusLabel.text = KayokoFingerString(@"Image Ready");
+                [self setStatusText:@"Image Ready"];
                 self.canvas.image = image;
                 [self updateControls];
             });
         }
     });
+}
+
+- (void)setStatusText:(NSString *)key {
+    self.controls.statusLabel.text = KayokoFingerString(key);
+    [self.controls setNeedsLayout];
 }
 
 - (void)setProcessing:(BOOL)processing {
@@ -286,7 +291,7 @@ static NSError *KayokoFingerError(NSString *key) {
                 if (!image) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
                 [self appendSnapshotURL:self.originalSnapshotURL image:image];
                 [self.canvas resetZoom];
-                self.controls.statusLabel.text = KayokoFingerString(@"Image Reset");
+                [self setStatusText:@"Image Reset"];
                 [self updateControls];
             });
         }
@@ -304,7 +309,7 @@ static NSError *KayokoFingerError(NSString *key) {
             [self setProcessing:NO];
             if (!data.length) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
             [UIPasteboard.generalPasteboard setData:data forPasteboardType:@"public.png"];
-            self.controls.statusLabel.text = KayokoFingerString(@"Image Copied");
+            [self setStatusText:@"Image Copied"];
         });
     });
 }
@@ -337,7 +342,7 @@ static NSError *KayokoFingerError(NSString *key) {
                 [self setProcessing:NO];
                 if (!written) { [self showError:KayokoFingerError(@"Unable to Apply Edit")]; return; }
                 [self appendSnapshotURL:URL image:result];
-                self.controls.statusLabel.text = KayokoFingerString(@"Image Edited");
+                [self setStatusText:@"Image Edited"];
                 [self updateControls];
             });
         }
@@ -382,7 +387,7 @@ static NSError *KayokoFingerError(NSString *key) {
                 [self setProcessing:NO];
                 if (!image) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
                 self.snapshotIndex = index;
-                self.controls.statusLabel.text = KayokoFingerString(@"Image Ready");
+                [self setStatusText:@"Image Ready"];
                 self.canvas.image = image;
                 [self updateControls];
             });
@@ -442,7 +447,7 @@ static NSError *KayokoFingerError(NSString *key) {
                         [self setProcessing:NO];
                         if (image) {
                             self.stickerImage = image;
-                            self.controls.statusLabel.text = KayokoFingerString(@"Overlay Ready");
+                            [self setStatusText:@"Overlay Ready"];
                         }
                         else [self showError:error ?: KayokoFingerError(@"Unable to Open Image")];
                     });
