@@ -145,6 +145,7 @@
 "Discard" = "Discard";
 
 // FingerEditor one-handed layout
+"Copy Image" = "Copy";
 "Annotate" = "Annotate";
 "Cover" = "Cover";
 "Mosaic" = "Mosaic";

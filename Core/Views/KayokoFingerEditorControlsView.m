@@ -35,6 +35,7 @@ static UIColor *KayokoFingerPanelColor(void) {
         _swatch = [[UIView alloc] init];
         _swatch.userInteractionEnabled = NO;
         _swatch.layer.cornerRadius = 13;
+        _swatch.clipsToBounds = YES;
         _swatch.layer.borderWidth = 1;
         [self addSubview:_swatch];
         _checkmark = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"checkmark"
@@ -214,7 +215,7 @@ static UIColor *KayokoFingerPanelColor(void) {
         _resetButton = [self actionButton:@"Reset" symbol:@"arrow.counterclockwise" identifier:@"finger.reset"];
         _undoButton = [self actionButton:@"Undo" symbol:@"arrow.uturn.backward" identifier:@"finger.undo"];
         _exportButton = [self actionButton:@"Export" symbol:@"square.and.arrow.up" identifier:@"finger.export"];
-        _copyButton = [self actionButton:@"Copy" symbol:@"doc.on.doc" identifier:@"finger.copy"];
+        _copyButton = [self actionButton:@"Copy Image" symbol:@"doc.on.doc" identifier:@"finger.copy"];
         _doneButton = [self actionButton:@"Done" symbol:@"checkmark" identifier:@"finger.done"];
         [self setSelectedColorIndex:1];
         [self setStrokeWidth:8];
