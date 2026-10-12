@@ -4,12 +4,20 @@ on:
   push:
     paths:
       - 'Core/Models/KayokoFingerImageRenderer.*'
+      - 'Core/Controllers/KayokoFingerEditorViewController.*'
+      - 'Core/Views/KayokoFingerCanvasView.*'
+      - 'Core/Views/KayokoFingerEditorControlsView.*'
+      - 'Preferences/Resources/*/Tweak.strings'
       - 'Core/Manager/KayokoHistoryStore.m'
       - 'tests/**'
       - '.github/workflows/image-editor-tests.yml'
   pull_request:
     paths:
       - 'Core/Models/KayokoFingerImageRenderer.*'
+      - 'Core/Controllers/KayokoFingerEditorViewController.*'
+      - 'Core/Views/KayokoFingerCanvasView.*'
+      - 'Core/Views/KayokoFingerEditorControlsView.*'
+      - 'Preferences/Resources/*/Tweak.strings'
       - 'Core/Manager/KayokoHistoryStore.m'
       - 'tests/**'
       - '.github/workflows/image-editor-tests.yml'
@@ -27,13 +35,28 @@ jobs:
         run: |
           command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate --spec tests/project.yml
-      - name: Run renderer pixel tests on iOS Simulator
+      - name: Run renderer and native editor layout tests on iOS Simulator
         run: |
           SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for group in d["devices"].values() for v in group if v["name"].startswith("iPhone")))')
           xcodebuild -project tests/KayokoEditorTests.xcodeproj -scheme KayokoEditorTests \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
             -resultBundlePath build/ImageEditorTests.xcresult \
             CODE_SIGNING_ALLOWED=NO test
+      - name: Export native editor screenshots
+        if: always()
+        run: |
+          if [ -d build/ImageEditorTests.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/ImageEditorTests.xcresult \
+              --output-path build/editor-screenshots
+          fi
+      - name: Upload native editor screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-layout-screenshots
+          path: build/editor-screenshots
+          if-no-files-found: ignore
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

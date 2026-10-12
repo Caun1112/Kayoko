@@ -5,7 +5,8 @@ tests execute the SQL extracted from KayokoHistoryStore against an in-memory
 database and check replacement, restore, late OCR completion and metadata isolation.
 
 The GitHub Actions workflow **Image editor regression tests** runs both the SQLite
-checks and the real renderer tests on iOS Simulator. It can also be started manually.
+checks, real renderer tests, and native editor layout/interaction tests on iOS
+Simulator. It can also be started manually.
 
 `KayokoFingerImageRendererTests.m` contains pixel-level iOS XCTest regressions for
 EXIF orientation, downsampling limits, reverse crop, masks, all privacy filters,
@@ -13,6 +14,19 @@ overlay aspect fit, and invalid inputs. Run `xcodegen generate --spec tests/proj
 then test the `KayokoEditorTests` scheme in the generated project on an iOS Simulator.
 The Theos build excludes the test sources. A full Xcode and
 iOS Simulator/device runtime are required; Command Line Tools alone cannot run them.
+
+`KayokoFingerEditorLayoutTests.m` links the production controller, canvas, dock and
+renderer. A contained controller supplies deterministic safe areas for 430×932,
+375×667, 320×568 and 844×390 point viewports. The tests wait for real image decoding,
+check that every visible editing control fits the viewport, verify the bottom/right
+dock and thumb-reachable actions in every mode, and exercise mode/tool, color,
+stroke width and canvas lock changes. Only SpringBoard's localization provider and
+the OCR service are stubbed; the shipped Chinese/English strings are copied into
+the test bundle. Screenshots use a generated sample image rather than clipboard data.
+
+CI retains screenshots for every viewport and mode in the
+`editor-layout-screenshots` artifact, exported from XCTest's image attachments.
+The complete `image-editor-test-results` artifact contains the `.xcresult` bundle.
 
 Build the actual package with `THEOS=/path/to/theos ./build.sh rootless`. Check its
 version/architecture and `/var/jb` payload with `dpkg-deb -f` and `dpkg-deb -c`;

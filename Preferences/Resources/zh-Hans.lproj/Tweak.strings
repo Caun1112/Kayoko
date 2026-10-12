@@ -111,7 +111,7 @@
 "Arrow" = "箭头";
 "Rectangle" = "方框";
 "Ellipse" = "圆框";
-"Pen" = "涂鸦";
+"Pen" = "涂鸦笔";
 "Fine Mosaic" = "细马赛克";
 "Coarse Mosaic" = "粗马赛克";
 "Blur" = "模糊";
@@ -143,3 +143,30 @@
 "The original clipboard image will remain unchanged." = "剪贴板中的原图片不会改变。";
 "Keep Editing" = "继续编辑";
 "Discard" = "放弃";
+
+// FingerEditor one-handed layout
+"Annotate" = "标注";
+"Cover" = "遮盖";
+"Mosaic" = "马赛克";
+"Color" = "颜色";
+"Width" = "线宽";
+"Style" = "种类";
+"Fine" = "细马赛克";
+"Coarse" = "粗马赛克";
+"Solid" = "纯色";
+"Image" = "导入图片";
+"Reset" = "重置";
+"Export" = "导出";
+"Import Overlay Image" = "导入遮盖图片";
+"Touch and hold to redo." = "长按可重做。";
+"Lock Image" = "锁定图片";
+"Unlock Image" = "解锁图片";
+"Unlock to move and zoom; lock to draw." = "解锁后移动或缩放，锁定后绘制。";
+"Draw on the image with one finger." = "在图片上用手指绘制";
+"Move or zoom the image, then tap the lock to edit." = "移动或缩放后，点击锁定以编辑";
+"Recognize text in the current image." = "识别图片中的文字，可选取复制";
+"Image Reset" = "已重置";
+"Image Copied" = "已复制图片";
+"Image Ready" = "图片已就绪";
+"Image Edited" = "已编辑";
+"Overlay Ready" = "覆盖图片已就绪";

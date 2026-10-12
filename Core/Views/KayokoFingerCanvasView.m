@@ -80,6 +80,7 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
         // finger is added to a stroke that has already begun.
         [_scrollView.panGestureRecognizer addTarget:self action:@selector(handleNavigationGesture:)];
         [_scrollView.pinchGestureRecognizer addTarget:self action:@selector(handleNavigationGesture:)];
+        self.navigationMode = NO;
     }
     return self;
 }
@@ -114,7 +115,12 @@ static CGFloat const kKayokoFingerMinimumDrag = 6.0;
     [self clearPreview];
     self.drawingGesture.enabled = !navigationMode;
     self.tapGesture.enabled = !navigationMode;
-    self.scrollView.panGestureRecognizer.minimumNumberOfTouches = navigationMode ? 1 : 2;
+    self.scrollView.panGestureRecognizer.minimumNumberOfTouches = 1;
+    self.scrollView.panGestureRecognizer.enabled = navigationMode;
+    self.scrollView.pinchGestureRecognizer.enabled = navigationMode;
+    self.imageView.accessibilityHint = [[KayokoPasteboardManager localizationBundle]
+        localizedStringForKey:navigationMode ? @"Move or zoom the image, then tap the lock to edit." : @"Draw on the image with one finger."
+        value:nil table:@"Tweak"];
 }
 
 - (void)resetZoom {

@@ -23,17 +23,34 @@ targets:
     platform: iOS
     sources:
       - KayokoFingerImageRendererTests.m
+      - KayokoFingerEditorLayoutTests.m
+      - KayokoEditorRuntimeStubs.m
+      - ../Core/Controllers/KayokoFingerEditorViewController.m
+      - ../Core/Views/KayokoFingerCanvasView.m
+      - ../Core/Views/KayokoFingerEditorControlsView.m
       - ../Core/Models/KayokoFingerImageRenderer.m
       - ../Core/Models/KayokoFingerImageRenderer.h
+      - path: ../Preferences/Resources
+        includes:
+          - zh-Hans.lproj/Tweak.strings
+          - en.lproj/Tweak.strings
+        buildPhase: resources
     dependencies:
       - target: KayokoEditorTestHost
       - sdk: UIKit.framework
       - sdk: CoreImage.framework
       - sdk: ImageIO.framework
+      - sdk: PhotosUI.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mlgm.kayoko.editor-tests
         GENERATE_INFOPLIST_FILE: YES
+        HEADER_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../Core/Controllers
+          - $(SRCROOT)/../Core/Views
+          - $(SRCROOT)/../Core/Models
+          - $(SRCROOT)/../Core/Manager
 schemes:
   KayokoEditorTests:
     build:

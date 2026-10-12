@@ -34,8 +34,10 @@
 		15F24563C7DE44D11D0B1580 /* KayokoTableViewCellContent.h in Headers */ = {isa = PBXBuildFile; fileRef = EB9B9D20D062CD3B287A30D7 /* KayokoTableViewCellContent.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		16C2997AB7E0BCC8B7595821 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60807AAA40AFC717167F32FF /* CoreGraphics.framework */; };
 		16FA672B51E457ED93EBBC82 /* HandOff-Search@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 211CB15BCA18809C87719E1C /* HandOff-Search@2x.png */; };
+		1774D12A64D11468C2955293 /* KayokoFingerEditorControlsView.m in Sources */ = {isa = PBXBuildFile; fileRef = FB190BF5DD2F5CFBE881E24E /* KayokoFingerEditorControlsView.m */; };
 		184196CB7E1DB39ADFD9AB35 /* KayokoEdgeFadingCollectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 239E200FDF8C8F7E0099FD07 /* KayokoEdgeFadingCollectionView.m */; };
 		19C56C9CE2C6FCE4447B1FBC /* HandOff.png in Resources */ = {isa = PBXBuildFile; fileRef = E7B8A1975D4A85B8E9795574 /* HandOff.png */; };
+		1A2808BFE3F1534E9AE8C8EA /* KayokoFingerEditorControlsView.h in Headers */ = {isa = PBXBuildFile; fileRef = 3730DD6D4B4813720DAF2CCF /* KayokoFingerEditorControlsView.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1ACE5FC7F6A1D4D9025D2600 /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 890F85979D3615E750A9B46C /* Vision.framework */; };
 		1AD7B9898E1168F1BB85E878 /* KayokoHistoryListView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4262F6D07BF7C56A6D0FA0CA /* KayokoHistoryListView.m */; };
 		1AF06015A4ACC2198253A324 /* KayokoSearchController.h in Headers */ = {isa = PBXBuildFile; fileRef = 5CE036CD3AFFE74C2FC6C4D7 /* KayokoSearchController.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -359,6 +361,7 @@
 		35C32A790EBC8C0E84AAA7E3 /* KayokoCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoCore.h; sourceTree = "<group>"; };
 		36387A6EA4559B6D272012F0 /* KayokoHeaderButtonStyle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoHeaderButtonStyle.h; sourceTree = "<group>"; };
 		36A9815467ADE6AD2713BF1B /* KayokoTagPlaceholderView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoTagPlaceholderView.h; sourceTree = "<group>"; };
+		3730DD6D4B4813720DAF2CCF /* KayokoFingerEditorControlsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoFingerEditorControlsView.h; sourceTree = "<group>"; };
 		374E7F473E295CB7E3EB1070 /* Copy.aiff */ = {isa = PBXFileReference; lastKnownFileType = audio.aiff; path = Copy.aiff; sourceTree = "<group>"; };
 		380B84700583BFF37E85E4B7 /* KayokoHeaderView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KayokoHeaderView.m; sourceTree = "<group>"; };
 		38622CD18967703FB86EC88F /* KayokoExternalHideCoordinator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KayokoExternalHideCoordinator.m; sourceTree = "<group>"; };
@@ -564,6 +567,7 @@
 		F9A074033490972EF895B446 /* KayokoInputSwitcherHooks.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = KayokoInputSwitcherHooks.mm; sourceTree = "<group>"; };
 		FABE6302356607FD5D4ED500 /* KayokoMainViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoMainViewController.h; sourceTree = "<group>"; };
 		FAC8D7B3D87E21C524A5DD67 /* KayokoEdgeFadingScrollView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoEdgeFadingScrollView.h; sourceTree = "<group>"; };
+		FB190BF5DD2F5CFBE881E24E /* KayokoFingerEditorControlsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KayokoFingerEditorControlsView.m; sourceTree = "<group>"; };
 		FB9200AECF827133129A26AD /* KayokoPreviewView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KayokoPreviewView.h; sourceTree = "<group>"; };
 		FCA230334D134677E29E3E82 /* KayokoPreviewView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KayokoPreviewView.m; sourceTree = "<group>"; };
 		FE367CB16F1C4B8AD5327C90 /* KayokoNoteEditorViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KayokoNoteEditorViewController.m; sourceTree = "<group>"; };
@@ -871,6 +875,8 @@
 				CCDC166157B445B7DDB50E6D /* KayokoFavoritesTableView.m */,
 				8E525A1979856FAC0798228B /* KayokoFingerCanvasView.h */,
 				E3286644D6E14C5B0072C5CD /* KayokoFingerCanvasView.m */,
+				3730DD6D4B4813720DAF2CCF /* KayokoFingerEditorControlsView.h */,
+				FB190BF5DD2F5CFBE881E24E /* KayokoFingerEditorControlsView.m */,
 				B229111452C9832B0DC2D28A /* KayokoGrabberView.h */,
 				D61127A65C0399E69F06B6C5 /* KayokoGrabberView.m */,
 				36387A6EA4559B6D272012F0 /* KayokoHeaderButtonStyle.h */,
@@ -1104,6 +1110,7 @@
 				EF4D644CF94C505BB70942E7 /* KayokoFilterCatalog.h in Headers */,
 				619AAB0E2D9530AAC34D71DE /* KayokoFilterOrderStore.h in Headers */,
 				A364A5BBC6A871CD69AC80EA /* KayokoFingerCanvasView.h in Headers */,
+				1A2808BFE3F1534E9AE8C8EA /* KayokoFingerEditorControlsView.h in Headers */,
 				3E998F171C81A9F8F9497A00 /* KayokoFingerEditorViewController.h in Headers */,
 				240607B317B02959FC1C21AC /* KayokoFingerImageRenderer.h in Headers */,
 				D72802B425623EBCF4C810A2 /* KayokoGrabberView.h in Headers */,
@@ -1403,6 +1410,7 @@
 				5CE42EFBDBE6C6FB3B6A22C0 /* KayokoFilterCatalog.m in Sources */,
 				847B148009BD36AB1B5AA668 /* KayokoFilterOrderStore.m in Sources */,
 				DBC95C7EB906A4F81E6841AA /* KayokoFingerCanvasView.m in Sources */,
+				1774D12A64D11468C2955293 /* KayokoFingerEditorControlsView.m in Sources */,
 				AF982979F33D8A12604285D4 /* KayokoFingerEditorViewController.m in Sources */,
 				764127CF365B7FF1D0456E59 /* KayokoFingerImageRenderer.m in Sources */,
 				79E66458D899A4D0CEFFF566 /* KayokoGrabberView.m in Sources */,
@@ -1639,7 +1647,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = "";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5.0.3;
+				CURRENT_PROJECT_VERSION = 5.0.4;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = NO;
@@ -1668,7 +1676,7 @@
 				KAYOKO_THEOS_PRIVATE_FRAMEWORKS = "$(KAYOKO_THEOS_SDK)/System/Library/PrivateFrameworks";
 				KAYOKO_THEOS_SDK = "$(THEOS)/sdks/iPhoneOS16.5.sdk";
 				LIBRARY_SEARCH_PATHS = "$(inherited) $(KAYOKO_SUBSTRATE_LIB_DIR) $(KAYOKO_ROOTHIDE_LIB_DIR)";
-				MARKETING_VERSION = 5.0.3;
+				MARKETING_VERSION = 5.0.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = NO;
@@ -1991,7 +1999,7 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = "";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5.0.3;
+				CURRENT_PROJECT_VERSION = 5.0.4;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = NO;
@@ -2025,7 +2033,7 @@
 				KAYOKO_THEOS_PRIVATE_FRAMEWORKS = "$(KAYOKO_THEOS_SDK)/System/Library/PrivateFrameworks";
 				KAYOKO_THEOS_SDK = "$(THEOS)/sdks/iPhoneOS16.5.sdk";
 				LIBRARY_SEARCH_PATHS = "$(inherited) $(KAYOKO_SUBSTRATE_LIB_DIR) $(KAYOKO_ROOTHIDE_LIB_DIR)";
-				MARKETING_VERSION = 5.0.3;
+				MARKETING_VERSION = 5.0.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

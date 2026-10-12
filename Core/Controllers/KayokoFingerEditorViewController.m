@@ -1,9 +1,11 @@
 #import "KayokoFingerEditorViewController.h"
 #import "KayokoFingerCanvasView.h"
+#import "KayokoFingerEditorControlsView.h"
 #import "KayokoFingerImageRenderer.h"
 #import "KayokoImageTextRecognizer.h"
 #import "KayokoPasteboardManager.h"
 #import <PhotosUI/PhotosUI.h>
+#import <math.h>
 
 static NSString *KayokoFingerString(NSString *key) {
     return [[KayokoPasteboardManager localizationBundle] localizedStringForKey:key value:key table:@"Tweak"];
@@ -27,17 +29,12 @@ static NSError *KayokoFingerError(NSString *key) {
 @property(nonatomic) BOOL saving;
 @property(nonatomic) BOOL invalidated;
 @property(nonatomic, strong) KayokoFingerCanvasView *canvas;
-@property(nonatomic, strong) UIStackView *toolStack;
-@property(nonatomic, strong) UIStackView *colorStack;
-@property(nonatomic, strong) UIStackView *commandStack;
-@property(nonatomic, strong) UISlider *widthSlider;
-@property(nonatomic, strong) UILabel *hintLabel;
-@property(nonatomic, strong) UIButton *cancelButton;
-@property(nonatomic, strong) UIButton *doneButton;
-@property(nonatomic, strong) UIButton *undoButton;
-@property(nonatomic, strong) UIButton *redoButton;
-@property(nonatomic, strong) UIButton *moveButton;
-@property(nonatomic, strong) UIButton *ocrButton;
+@property(nonatomic, strong) KayokoFingerEditorControlsView *controls;
+@property(nonatomic, strong) UIButton *lockButton;
+@property(nonatomic) NSInteger selectedMode;
+@property(nonatomic) KayokoFingerTool annotationTool;
+@property(nonatomic) KayokoFingerTool maskTool;
+@property(nonatomic) BOOL imageNavigationUnlocked;
 @property(nonatomic, strong) UIActivityIndicatorView *spinner;
 @property(nonatomic, strong, nullable) UIImage *stickerImage;
 @end
@@ -59,6 +56,7 @@ static NSError *KayokoFingerError(NSString *key) {
                              isDirectory:YES];
         self.modalPresentationStyle = UIModalPresentationOverFullScreen;
         self.modalInPresentation = YES;
+        self.modalPresentationCapturesStatusBarAppearance = YES;
     }
     return self;
 }
@@ -67,150 +65,93 @@ static NSError *KayokoFingerError(NSString *key) {
     [[NSFileManager defaultManager] removeItemAtURL:_directoryURL error:nil];
 }
 
-- (UIButton *)buttonWithTitle:(NSString *)title action:(SEL)action {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    [button setTitle:KayokoFingerString(title) forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    button.contentEdgeInsets = UIEdgeInsetsMake(8, 10, 8, 10);
-    button.layer.cornerRadius = 8;
-    [button.heightAnchor constraintEqualToConstant:44].active = YES;
-    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
-    return button;
-}
-
-- (UIScrollView *)scrollViewForStack:(UIStackView *)stack {
-    UIScrollView *scrollView = [[UIScrollView alloc] init];
-    scrollView.showsHorizontalScrollIndicator = NO;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [scrollView addSubview:stack];
-    [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.leadingAnchor constant:8],
-        [stack.trailingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.trailingAnchor constant:-8],
-        [stack.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor],
-        [stack.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor],
-        [stack.heightAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.heightAnchor]
-    ]];
-    return scrollView;
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = UIColor.systemBackgroundColor;
-    self.view.tintColor = UIColor.systemBlueColor;
+    self.view.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.08 alpha:1] :
+            [UIColor colorWithRed:0.985 green:0.985 blue:0.975 alpha:1];
+    }];
+    self.view.tintColor = UIColor.labelColor;
+    self.annotationTool = kKayokoFingerToolArrow;
+    self.maskTool = kKayokoFingerToolCover;
     self.canvas = [[KayokoFingerCanvasView alloc] initWithFrame:CGRectZero];
-    self.canvas.tool = kKayokoFingerToolArrow;
+    self.canvas.accessibilityIdentifier = @"finger.canvas";
+    self.canvas.tool = self.annotationTool;
     self.canvas.strokeColor = UIColor.systemRedColor;
-    self.canvas.strokeWidth = 5;
+    self.canvas.strokeWidth = 8;
+    self.canvas.layer.cornerRadius = 8;
+    self.canvas.layer.borderWidth = 0.5;
+    self.canvas.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? [UIColor colorWithWhite:0.12 alpha:1] :
+            [UIColor colorWithRed:0.918 green:0.924 blue:0.910 alpha:1];
+    }];
     __weak typeof(self) weakSelf = self;
-    self.canvas.operationHandler = ^(KayokoFingerEditOperation *operation) {
-        [weakSelf applyOperation:operation];
-    };
+    self.canvas.operationHandler = ^(KayokoFingerEditOperation *operation) { [weakSelf applyOperation:operation]; };
     self.canvas.textPositionHandler = ^(CGPoint point) { [weakSelf requestTextAtPoint:point]; };
+    [self.view addSubview:self.canvas];
 
-    self.cancelButton = [self buttonWithTitle:@"Cancel" action:@selector(cancel)];
-    self.doneButton = [self buttonWithTitle:@"Done" action:@selector(save)];
-    self.doneButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    UILabel *title = [[UILabel alloc] init];
-    title.text = @"FingerEditor";
-    title.font = [UIFont boldSystemFontOfSize:17];
-    title.textAlignment = NSTextAlignmentCenter;
-    [title setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
-    UIStackView *header = [[UIStackView alloc] initWithArrangedSubviews:@[self.cancelButton, title, self.doneButton]];
-    header.alignment = UIStackViewAlignmentCenter;
-    self.undoButton = [self buttonWithTitle:@"Undo" action:@selector(undo)];
-    self.redoButton = [self buttonWithTitle:@"Redo" action:@selector(redo)];
-    self.moveButton = [self buttonWithTitle:@"Move Image" action:@selector(toggleMove)];
-    self.ocrButton = [self buttonWithTitle:@"Recognize Text" action:@selector(recognizeText)];
-    self.commandStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.undoButton, self.redoButton, self.moveButton, self.ocrButton]];
-    UIScrollView *commands = [self scrollViewForStack:self.commandStack];
+    self.controls = [[KayokoFingerEditorControlsView alloc] initWithFrame:CGRectZero];
+    self.controls.accessibilityIdentifier = @"finger.controls";
+    self.controls.modeSelectionHandler = ^(NSInteger mode) { [weakSelf selectMode:mode]; };
+    self.controls.toolSelectionHandler = ^(KayokoFingerTool tool) { [weakSelf selectToolValue:tool]; };
+    self.controls.colorSelectionHandler = ^(NSInteger index) { [weakSelf selectColorIndex:index]; };
+    [self.controls setStrokeWidth:8];
+    [self.controls setSelectedColorIndex:1];
+    [self.controls.cancelButton addTarget:self action:@selector(cancel) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.doneButton addTarget:self action:@selector(save) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.resetButton addTarget:self action:@selector(resetImage) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.undoButton addTarget:self action:@selector(undo) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.exportButton addTarget:self action:@selector(exportImage) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.copyButton addTarget:self action:@selector(copyImage) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.recognizeButton addTarget:self action:@selector(recognizeText) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.importOverlayButton addTarget:self action:@selector(chooseSticker) forControlEvents:UIControlEventTouchUpInside];
+    [self.controls.widthSlider addTarget:self action:@selector(widthChanged) forControlEvents:UIControlEventValueChanged];
+    self.controls.undoButton.accessibilityHint = KayokoFingerString(@"Touch and hold to redo.");
+    [self.view addSubview:self.controls];
 
-    self.toolStack = [[UIStackView alloc] init];
-    self.toolStack.spacing = 4;
-    NSArray *tools = @[@[@(kKayokoFingerToolArrow), @"Arrow"], @[@(kKayokoFingerToolRectangle), @"Rectangle"],
-        @[@(kKayokoFingerToolEllipse), @"Ellipse"], @[@(kKayokoFingerToolText), @"Text"],
-        @[@(kKayokoFingerToolPen), @"Pen"], @[@(kKayokoFingerToolMosaic), @"Fine Mosaic"],
-        @[@(kKayokoFingerToolCoarseMosaic), @"Coarse Mosaic"], @[@(kKayokoFingerToolBlur), @"Blur"],
-        @[@(kKayokoFingerToolCover), @"Solid Cover"], @[@(kKayokoFingerToolPixelate), @"Mosaic Cover"],
-        @[@(kKayokoFingerToolCrop), @"Crop"], @[@(kKayokoFingerToolSticker), @"Image Overlay"]];
-    for (NSArray *entry in tools) {
-        UIButton *button = [self buttonWithTitle:entry[1] action:@selector(selectTool:)];
-        button.tag = [entry[0] integerValue];
-        [self.toolStack addArrangedSubview:button];
-    }
-    UIScrollView *toolsScroll = [self scrollViewForStack:self.toolStack];
-    self.colorStack = [[UIStackView alloc] init];
-    self.colorStack.spacing = 2;
-    NSArray *colors = @[UIColor.blackColor, UIColor.systemRedColor, UIColor.systemYellowColor,
-                        UIColor.systemBlueColor, UIColor.systemGreenColor, UIColor.whiteColor];
-    NSArray *colorNames = @[@"Black", @"Red", @"Yellow", @"Blue", @"Green", @"White"];
-    for (NSUInteger i = 0; i < colors.count; i++) {
-        UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
-        button.backgroundColor = colors[i];
-        button.tag = i;
-        button.layer.cornerRadius = 18;
-        button.layer.borderColor = UIColor.systemGrayColor.CGColor;
-        button.layer.borderWidth = 1;
-        button.accessibilityLabel = KayokoFingerString(colorNames[i]);
-        [button.widthAnchor constraintEqualToConstant:36].active = YES;
-        [button.heightAnchor constraintEqualToConstant:36].active = YES;
-        [button setTitle:i == 1 ? @"✓" : @"" forState:UIControlStateNormal];
-        [button setTitleColor:(i == 2 || i == 5) ? UIColor.blackColor : UIColor.whiteColor forState:UIControlStateNormal];
-        [button addTarget:self action:@selector(selectColor:) forControlEvents:UIControlEventTouchUpInside];
-        [self.colorStack addArrangedSubview:button];
-    }
-    self.colorStack.alignment = UIStackViewAlignmentCenter;
-    self.widthSlider = [[UISlider alloc] init];
-    self.widthSlider.minimumValue = 2;
-    self.widthSlider.maximumValue = 40;
-    self.widthSlider.value = 5;
-    self.widthSlider.accessibilityLabel = KayokoFingerString(@"Stroke Width");
-    [self.widthSlider addTarget:self action:@selector(widthChanged) forControlEvents:UIControlEventValueChanged];
-    UIStackView *options = [[UIStackView alloc] initWithArrangedSubviews:@[self.colorStack, self.widthSlider]];
-    options.spacing = 12;
-    options.alignment = UIStackViewAlignmentCenter;
-    self.hintLabel = [[UILabel alloc] init];
-    self.hintLabel.font = [UIFont systemFontOfSize:12];
-    self.hintLabel.textColor = UIColor.secondaryLabelColor;
-    self.hintLabel.textAlignment = NSTextAlignmentCenter;
-    self.hintLabel.numberOfLines = 2;
+    self.lockButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.lockButton.accessibilityIdentifier = @"finger.lock";
+    self.lockButton.backgroundColor = UIColor.systemBackgroundColor;
+    self.lockButton.tintColor = UIColor.labelColor;
+    self.lockButton.layer.cornerRadius = 22;
+    self.lockButton.layer.shadowColor = UIColor.blackColor.CGColor;
+    self.lockButton.layer.shadowOpacity = 0.13;
+    self.lockButton.layer.shadowRadius = 5;
+    self.lockButton.layer.shadowOffset = CGSizeMake(0, 2);
+    [self.lockButton addTarget:self action:@selector(toggleMove) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.lockButton];
     self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     self.spinner.hidesWhenStopped = YES;
-
-    for (UIView *view in @[header, commands, self.canvas, toolsScroll, options, self.hintLabel, self.spinner]) {
-        view.translatesAutoresizingMaskIntoConstraints = NO;
-        [self.view addSubview:view];
-    }
-    UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
-    [NSLayoutConstraint activateConstraints:@[
-        [header.topAnchor constraintEqualToAnchor:safe.topAnchor],
-        [header.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:8],
-        [header.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-8],
-        [header.heightAnchor constraintEqualToConstant:48],
-        [commands.topAnchor constraintEqualToAnchor:header.bottomAnchor],
-        [commands.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
-        [commands.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
-        [commands.heightAnchor constraintEqualToConstant:44],
-        [self.canvas.topAnchor constraintEqualToAnchor:commands.bottomAnchor constant:4],
-        [self.canvas.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
-        [self.canvas.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
-        [self.canvas.bottomAnchor constraintEqualToAnchor:toolsScroll.topAnchor constant:-4],
-        [toolsScroll.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
-        [toolsScroll.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
-        [toolsScroll.heightAnchor constraintEqualToConstant:44],
-        [toolsScroll.bottomAnchor constraintEqualToAnchor:options.topAnchor constant:-4],
-        [options.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12],
-        [options.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-12],
-        [options.heightAnchor constraintEqualToConstant:44],
-        [options.bottomAnchor constraintEqualToAnchor:self.hintLabel.topAnchor constant:-4],
-        [self.hintLabel.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12],
-        [self.hintLabel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-12],
-        [self.hintLabel.heightAnchor constraintEqualToConstant:34],
-        [self.hintLabel.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-4],
-        [self.spinner.centerXAnchor constraintEqualToAnchor:self.canvas.centerXAnchor],
-        [self.spinner.centerYAnchor constraintEqualToAnchor:self.canvas.centerYAnchor]
-    ]];
+    [self.view addSubview:self.spinner];
     [self updateToolAppearance];
     [self loadImage];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGRect safe = UIEdgeInsetsInsetRect(self.view.bounds, self.view.safeAreaInsets);
+    CGRect content = CGRectInset(safe, 12, 8);
+    BOOL landscape = content.size.width > content.size.height && content.size.width >= 600;
+    [self.controls setCompactLayout:landscape];
+    if (landscape) {
+        CGFloat dockWidth = MIN(350, floor(content.size.width * 0.48));
+        self.controls.frame = CGRectMake(CGRectGetMaxX(content) - dockWidth, content.origin.y,
+                                         dockWidth, content.size.height);
+        self.canvas.frame = CGRectMake(content.origin.x, content.origin.y,
+                                       content.size.width - dockWidth - 10, content.size.height);
+    } else {
+        CGFloat height = MIN(self.controls.preferredHeight, MAX(220, content.size.height - 140));
+        self.controls.frame = CGRectMake(content.origin.x, CGRectGetMaxY(content) - height, content.size.width, height);
+        self.canvas.frame = CGRectMake(content.origin.x, content.origin.y, content.size.width,
+                                       MAX(0, content.size.height - height - 10));
+    }
+    self.lockButton.frame = CGRectMake(CGRectGetMaxX(self.canvas.frame) - 54, CGRectGetMaxY(self.canvas.frame) - 54, 44, 44);
+    self.spinner.center = self.canvas.center;
+    self.canvas.layer.borderColor = [UIColor.separatorColor colorWithAlphaComponent:0.4].CGColor;
+}
+
+- (UIStatusBarStyle)preferredStatusBarStyle {
+    return self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark ? UIStatusBarStyleLightContent : UIStatusBarStyleDarkContent;
 }
 
 - (NSURL *)newSnapshotURL {
@@ -237,6 +178,7 @@ static NSError *KayokoFingerError(NSString *key) {
                 }
                 [self.snapshots addObject:URL];
                 self.originalSnapshotURL = URL;
+                self.controls.statusLabel.text = KayokoFingerString(@"Image Ready");
                 self.canvas.image = image;
                 [self updateControls];
             });
@@ -253,60 +195,126 @@ static NSError *KayokoFingerError(NSString *key) {
 - (void)updateControls {
     BOOL ready = !self.busy && !self.invalidated && self.snapshots.count > 0;
     self.canvas.userInteractionEnabled = ready;
-    self.toolStack.userInteractionEnabled = ready;
-    self.colorStack.userInteractionEnabled = ready;
-    self.widthSlider.enabled = ready;
-    self.doneButton.enabled = ready;
-    self.cancelButton.enabled = !self.busy;
-    self.undoButton.enabled = ready && self.snapshotIndex > 0;
-    self.redoButton.enabled = ready && self.snapshotIndex + 1 < self.snapshots.count;
-    self.ocrButton.enabled = ready;
-    self.moveButton.enabled = ready;
+    self.controls.userInteractionEnabled = !self.busy && !self.invalidated;
+    self.controls.alpha = self.busy ? 0.55 : 1;
+    self.controls.widthSlider.enabled = ready;
+    self.controls.doneButton.enabled = ready;
+    self.controls.cancelButton.enabled = !self.busy && !self.invalidated;
+    self.controls.resetButton.enabled = ready && ![self.snapshots[self.snapshotIndex] isEqual:self.originalSnapshotURL];
+    self.controls.exportButton.enabled = ready;
+    self.controls.copyButton.enabled = ready;
+    BOOL canUndo = ready && self.snapshotIndex > 0;
+    BOOL canRedo = ready && self.snapshotIndex + 1 < self.snapshots.count;
+    self.controls.undoButton.enabled = canUndo || canRedo;
+    self.controls.undoButton.showsMenuAsPrimaryAction = !canUndo && canRedo;
+    __weak typeof(self) weakSelf = self;
+    UIAction *redo = [UIAction actionWithTitle:KayokoFingerString(@"Redo") image:[UIImage systemImageNamed:@"arrow.uturn.forward"]
+        identifier:nil handler:^(__unused UIAction *action) { [weakSelf redo]; }];
+    redo.attributes = canRedo ? 0 : UIMenuElementAttributesDisabled;
+    self.controls.undoButton.menu = [UIMenu menuWithChildren:@[redo]];
+    self.controls.recognizeButton.enabled = ready;
+    self.controls.importOverlayButton.enabled = ready;
+    self.lockButton.enabled = ready && self.selectedMode != 2;
 }
 
 - (void)updateToolAppearance {
-    for (UIButton *button in self.toolStack.arrangedSubviews) {
-        BOOL selected = !self.canvas.navigationMode && button.tag == self.canvas.tool;
-        button.backgroundColor = selected ? [UIColor.systemBlueColor colorWithAlphaComponent:0.15] : UIColor.clearColor;
-        button.accessibilityTraits = UIAccessibilityTraitButton | (selected ? UIAccessibilityTraitSelected : 0);
-    }
-    self.moveButton.backgroundColor = self.canvas.navigationMode ?
-        [UIColor.systemBlueColor colorWithAlphaComponent:0.15] : UIColor.clearColor;
-    NSString *hint = @"Draw with one finger. Pinch to zoom or drag with two fingers to move.";
-    if (self.canvas.navigationMode) hint = @"Drag to move the image. Select a tool to continue editing.";
-    else if (self.canvas.tool == kKayokoFingerToolText) hint = @"Tap the image to add text.";
-    else if (self.canvas.tool == kKayokoFingerToolCrop) hint = @"Drag a rectangle to crop. Undo restores the previous image.";
-    else if (self.canvas.tool == kKayokoFingerToolCover || self.canvas.tool == kKayokoFingerToolPixelate ||
-             self.canvas.tool == kKayokoFingerToolSticker) hint = @"Drag a rectangle over the area to cover.";
-    self.hintLabel.text = KayokoFingerString(hint);
+    [self.controls setSelectedMode:self.selectedMode tool:self.canvas.tool];
+    BOOL navigation = self.imageNavigationUnlocked || self.selectedMode == 2;
+    self.canvas.navigationMode = navigation;
+    UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightSemibold];
+    [self.lockButton setImage:[UIImage systemImageNamed:navigation ? @"lock.open.fill" : @"lock.fill" withConfiguration:configuration]
+                     forState:UIControlStateNormal];
+    self.lockButton.accessibilityLabel = KayokoFingerString(navigation ? @"Lock Image" : @"Unlock Image");
+    self.lockButton.accessibilityHint = KayokoFingerString(@"Unlock to move and zoom; lock to draw.");
+    NSString *hint = @"Draw on the image with one finger.";
+    if (navigation) hint = @"Move or zoom the image, then tap the lock to edit.";
+    if (self.selectedMode == 2) hint = @"Recognize text in the current image.";
+    else if (!navigation && self.canvas.tool == kKayokoFingerToolText) hint = @"Tap the image to add text.";
+    else if (!navigation && self.canvas.tool == kKayokoFingerToolCrop) hint = @"Drag a rectangle to crop. Undo restores the previous image.";
+    else if (!navigation && (self.canvas.tool == kKayokoFingerToolCover || self.canvas.tool == kKayokoFingerToolPixelate ||
+                            self.canvas.tool == kKayokoFingerToolSticker)) hint = @"Drag a rectangle over the area to cover.";
+    self.controls.hintLabel.text = KayokoFingerString(hint);
+    [self updateControls];
 }
 
-- (void)selectTool:(UIButton *)sender {
-    if (self.busy) return;
-    self.canvas.tool = sender.tag;
-    self.canvas.navigationMode = NO;
-    if (sender.tag == kKayokoFingerToolMosaic || sender.tag == kKayokoFingerToolCoarseMosaic || sender.tag == kKayokoFingerToolBlur) {
-        if (self.widthSlider.value < 16) self.widthSlider.value = 24;
-    } else if (self.widthSlider.value > 16) {
-        self.widthSlider.value = 5;
-    }
-    [self widthChanged];
+- (void)selectMode:(NSInteger)mode {
+    if (self.busy || self.invalidated || mode < 0 || mode > 3) return;
+    self.selectedMode = mode;
+    if (mode == 0) self.canvas.tool = self.annotationTool;
+    else if (mode == 1) self.canvas.tool = self.maskTool;
+    else if (mode == 3) self.canvas.tool = kKayokoFingerToolCrop;
     [self updateToolAppearance];
-    if (sender.tag == kKayokoFingerToolSticker) [self chooseSticker];
 }
 
-- (void)selectColor:(UIButton *)sender {
-    self.canvas.strokeColor = sender.backgroundColor;
-    for (UIButton *button in self.colorStack.arrangedSubviews) {
-        [button setTitle:button == sender ? @"✓" : @"" forState:UIControlStateNormal];
-        button.accessibilityTraits = UIAccessibilityTraitButton | (button == sender ? UIAccessibilityTraitSelected : 0);
-    }
+- (void)selectToolValue:(KayokoFingerTool)tool {
+    if (self.busy || self.invalidated) return;
+    self.canvas.tool = tool;
+    self.imageNavigationUnlocked = NO;
+    if (self.selectedMode == 0) self.annotationTool = tool;
+    else if (self.selectedMode == 1) self.maskTool = tool;
+    [self updateToolAppearance];
 }
 
-- (void)widthChanged { self.canvas.strokeWidth = self.widthSlider.value; }
+- (void)selectColorIndex:(NSInteger)index {
+    NSArray<UIColor *> *colors = @[UIColor.blackColor, UIColor.systemRedColor, UIColor.systemYellowColor,
+                                  UIColor.systemBlueColor, UIColor.systemGreenColor, UIColor.whiteColor];
+    if (self.busy || self.invalidated || index < 0 || index >= (NSInteger)colors.count) return;
+    self.canvas.strokeColor = colors[index];
+    [self.controls setSelectedColorIndex:index];
+}
+
+- (void)widthChanged {
+    self.canvas.strokeWidth = self.controls.widthSlider.value;
+    [self.controls setStrokeWidth:self.canvas.strokeWidth];
+}
+
 - (void)toggleMove {
-    self.canvas.navigationMode = !self.canvas.navigationMode;
+    if (self.busy || self.invalidated || self.selectedMode == 2) return;
+    self.imageNavigationUnlocked = !self.imageNavigationUnlocked;
     [self updateToolAppearance];
+}
+
+- (void)resetImage {
+    if (self.busy || self.invalidated || !self.originalSnapshotURL) return;
+    [self setProcessing:YES];
+    dispatch_async(self.processingQueue, ^{
+        @autoreleasepool {
+            UIImage *image = [KayokoFingerImageRenderer preparedImageAtURL:self.originalSnapshotURL];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.invalidated) return;
+                [self setProcessing:NO];
+                if (!image) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
+                [self appendSnapshotURL:self.originalSnapshotURL image:image];
+                [self.canvas resetZoom];
+                self.controls.statusLabel.text = KayokoFingerString(@"Image Reset");
+                [self updateControls];
+            });
+        }
+    });
+}
+
+- (void)copyImage {
+    if (self.busy || self.invalidated || !self.snapshots.count) return;
+    NSURL *URL = self.snapshots[self.snapshotIndex];
+    [self setProcessing:YES];
+    dispatch_async(self.processingQueue, ^{
+        NSData *data = [NSData dataWithContentsOfURL:URL];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.invalidated) return;
+            [self setProcessing:NO];
+            if (!data.length) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
+            [UIPasteboard.generalPasteboard setData:data forPasteboardType:@"public.png"];
+            self.controls.statusLabel.text = KayokoFingerString(@"Image Copied");
+        });
+    });
+}
+
+- (void)exportImage {
+    if (self.busy || self.invalidated || !self.canvas.image || self.presentedViewController) return;
+    UIActivityViewController *activity = [[UIActivityViewController alloc] initWithActivityItems:@[self.canvas.image] applicationActivities:nil];
+    activity.popoverPresentationController.sourceView = self.controls.exportButton;
+    activity.popoverPresentationController.sourceRect = self.controls.exportButton.bounds;
+    [self presentViewController:activity animated:YES completion:nil];
 }
 
 - (void)applyOperation:(KayokoFingerEditOperation *)operation {
@@ -328,22 +336,36 @@ static NSError *KayokoFingerError(NSString *key) {
                 if (self.invalidated) return;
                 [self setProcessing:NO];
                 if (!written) { [self showError:KayokoFingerError(@"Unable to Apply Edit")]; return; }
-                while (self.snapshots.count > self.snapshotIndex + 1) {
-                    [[NSFileManager defaultManager] removeItemAtURL:self.snapshots.lastObject error:nil];
-                    [self.snapshots removeLastObject];
-                }
-                [self.snapshots addObject:URL];
-                // Undo images live on disk; retain only the current decoded bitmap.
-                if (self.snapshots.count > 13) {
-                    [[NSFileManager defaultManager] removeItemAtURL:self.snapshots.firstObject error:nil];
-                    [self.snapshots removeObjectAtIndex:0];
-                }
-                self.snapshotIndex = self.snapshots.count - 1;
-                self.canvas.image = result;
+                [self appendSnapshotURL:URL image:result];
+                self.controls.statusLabel.text = KayokoFingerString(@"Image Edited");
                 [self updateControls];
             });
         }
     });
+}
+
+- (void)removeSnapshotFileIfUnused:(NSURL *)URL {
+    if (![URL isEqual:self.originalSnapshotURL] && ![self.snapshots containsObject:URL]) {
+        [[NSFileManager defaultManager] removeItemAtURL:URL error:nil];
+    }
+}
+
+- (void)appendSnapshotURL:(NSURL *)URL image:(UIImage *)image {
+    while (self.snapshots.count > self.snapshotIndex + 1) {
+        NSURL *discarded = self.snapshots.lastObject;
+        [self.snapshots removeLastObject];
+        [self removeSnapshotFileIfUnused:discarded];
+    }
+    [self.snapshots addObject:URL];
+    // Keep Reset reversible without deleting the immutable session original,
+    // even when it appears in more than one undo/redo slot.
+    if (self.snapshots.count > 13) {
+        NSURL *discarded = self.snapshots.firstObject;
+        [self.snapshots removeObjectAtIndex:0];
+        [self removeSnapshotFileIfUnused:discarded];
+    }
+    self.snapshotIndex = self.snapshots.count - 1;
+    self.canvas.image = image;
 }
 
 - (void)undo { if (self.snapshotIndex > 0) [self loadSnapshot:self.snapshotIndex - 1]; }
@@ -360,6 +382,7 @@ static NSError *KayokoFingerError(NSString *key) {
                 [self setProcessing:NO];
                 if (!image) { [self showError:KayokoFingerError(@"Unable to Open Image")]; return; }
                 self.snapshotIndex = index;
+                self.controls.statusLabel.text = KayokoFingerString(@"Image Ready");
                 self.canvas.image = image;
                 [self updateControls];
             });
@@ -417,7 +440,10 @@ static NSError *KayokoFingerError(NSString *key) {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         if (self.invalidated) return;
                         [self setProcessing:NO];
-                        if (image) self.stickerImage = image;
+                        if (image) {
+                            self.stickerImage = image;
+                            self.controls.statusLabel.text = KayokoFingerString(@"Overlay Ready");
+                        }
                         else [self showError:error ?: KayokoFingerError(@"Unable to Open Image")];
                     });
                 }
@@ -434,37 +460,57 @@ static NSError *KayokoFingerError(NSString *key) {
             if (self.invalidated) return;
             [self setProcessing:NO];
             if (!text.length) { [self showError:KayokoFingerError(@"No Text Recognized")]; return; }
-            UIViewController *result = [[UIViewController alloc] init];
-            result.title = KayokoFingerString(@"Recognized Text");
-            result.view.backgroundColor = UIColor.systemBackgroundColor;
-            UITextView *textView = [[UITextView alloc] init];
-            textView.text = text;
-            textView.editable = NO;
-            textView.selectable = YES;
-            textView.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
-            textView.textContainerInset = UIEdgeInsetsMake(16, 16, 16, 16);
-            textView.translatesAutoresizingMaskIntoConstraints = NO;
-            [result.view addSubview:textView];
-            UILayoutGuide *safe = result.view.safeAreaLayoutGuide;
-            [NSLayoutConstraint activateConstraints:@[
-                [textView.topAnchor constraintEqualToAnchor:safe.topAnchor],
-                [textView.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
-                [textView.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
-                [textView.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor]
-            ]];
-            __weak typeof(self) weakSelf = self;
-            result.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithPrimaryAction:
-                [UIAction actionWithTitle:KayokoFingerString(@"Done") image:nil identifier:nil handler:^(__unused UIAction *action) {
-                    [weakSelf dismissViewControllerAnimated:YES completion:nil];
-                }]];
-            result.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithPrimaryAction:
-                [UIAction actionWithTitle:KayokoFingerString(@"Copy All") image:nil identifier:nil handler:^(__unused UIAction *action) {
-                    UIPasteboard.generalPasteboard.string = text;
-                    [weakSelf dismissViewControllerAnimated:YES completion:nil];
-                }]];
-            UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:result];
-            [self presentViewController:navigation animated:YES completion:nil];
+            [self presentRecognizedText:text];
         }];
+}
+
+- (void)presentRecognizedText:(NSString *)text {
+    UIViewController *result = [[UIViewController alloc] init];
+    result.view.backgroundColor = self.view.backgroundColor;
+    UILabel *title = [[UILabel alloc] init];
+    title.text = KayokoFingerString(@"Recognized Text");
+    title.font = [UIFont boldSystemFontOfSize:20];
+    title.textAlignment = NSTextAlignmentCenter;
+    UITextView *textView = [[UITextView alloc] init];
+    textView.text = text;
+    textView.editable = NO;
+    textView.selectable = YES;
+    textView.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+    textView.backgroundColor = UIColor.clearColor;
+    textView.textContainerInset = UIEdgeInsetsMake(16, 16, 16, 16);
+    UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
+    UIButton *copy = [UIButton buttonWithType:UIButtonTypeSystem];
+    [close setTitle:KayokoFingerString(@"Done") forState:UIControlStateNormal];
+    [copy setTitle:KayokoFingerString(@"Copy All") forState:UIControlStateNormal];
+    __weak typeof(self) weakSelf = self;
+    [close addAction:[UIAction actionWithHandler:^(__unused UIAction *action) {
+        [weakSelf dismissViewControllerAnimated:YES completion:nil];
+    }] forControlEvents:UIControlEventTouchUpInside];
+    [copy addAction:[UIAction actionWithHandler:^(__unused UIAction *action) {
+        UIPasteboard.generalPasteboard.string = text;
+        [weakSelf dismissViewControllerAnimated:YES completion:nil];
+    }] forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *footer = [[UIStackView alloc] initWithArrangedSubviews:@[close, copy]];
+    footer.distribution = UIStackViewDistributionFillEqually;
+    footer.tintColor = UIColor.labelColor;
+    for (UIView *view in @[title, textView, footer]) {
+        view.translatesAutoresizingMaskIntoConstraints = NO;
+        [result.view addSubview:view];
+    }
+    UILayoutGuide *safe = result.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [title.topAnchor constraintEqualToAnchor:safe.topAnchor constant:12],
+        [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor],
+        [textView.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:8],
+        [textView.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
+        [textView.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
+        [textView.bottomAnchor constraintEqualToAnchor:footer.topAnchor constant:-8],
+        [footer.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12],
+        [footer.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-12],
+        [footer.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
+        [footer.heightAnchor constraintEqualToConstant:48]
+    ]];
+    [self presentViewController:result animated:YES completion:nil];
 }
 
 - (void)showError:(NSError *)error {
@@ -518,6 +564,8 @@ static NSError *KayokoFingerError(NSString *key) {
     self.canvas.operationHandler = nil;
     self.canvas.textPositionHandler = nil;
     self.canvas.userInteractionEnabled = NO;
+    self.controls.userInteractionEnabled = NO;
+    self.lockButton.enabled = NO;
 }
 
 @end

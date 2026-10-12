@@ -143,3 +143,30 @@
 "The original clipboard image will remain unchanged." = "The original clipboard image will remain unchanged.";
 "Keep Editing" = "Keep Editing";
 "Discard" = "Discard";
+
+// FingerEditor one-handed layout
+"Annotate" = "Annotate";
+"Cover" = "Cover";
+"Mosaic" = "Mosaic";
+"Color" = "Color";
+"Width" = "Width";
+"Style" = "Style";
+"Fine" = "Fine";
+"Coarse" = "Coarse";
+"Solid" = "Solid";
+"Image" = "Image";
+"Reset" = "Reset";
+"Export" = "Export";
+"Import Overlay Image" = "Import Overlay Image";
+"Touch and hold to redo." = "Touch and hold to redo.";
+"Lock Image" = "Lock Image";
+"Unlock Image" = "Unlock Image";
+"Unlock to move and zoom; lock to draw." = "Unlock to move and zoom; lock to draw.";
+"Draw on the image with one finger." = "Draw on the image with one finger.";
+"Move or zoom the image, then tap the lock to edit." = "Move or zoom the image, then tap the lock to edit.";
+"Recognize text in the current image." = "Recognize text in the current image.";
+"Image Reset" = "Image Reset";
+"Image Copied" = "Image Copied";
+"Image Ready" = "Image Ready";
+"Image Edited" = "Image Edited";
+"Overlay Ready" = "Overlay Ready";
