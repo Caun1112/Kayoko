@@ -484,6 +484,9 @@
         XCTAssertFalse(header.imageToolsButton.hidden);
         XCTAssertTrue(header.imageToolsButton.enabled);
         XCTAssertTrue(header.leadingButtonOnTrailingSide);
+        XCTAssertTrue(((NSLayoutConstraint *)[header valueForKey:@"leadingButtonRightConstraint"]).active);
+        XCTAssertFalse(((NSLayoutConstraint *)[header valueForKey:@"leadingButtonLeftConstraint"]).active);
+        XCTAssertEqualWithAccuracy(((NSLayoutConstraint *)[header valueForKey:@"trailingStackTrailingConstraint"]).constant, -64, 0.01);
         CGRect back = [header.leadingButton convertRect:header.leadingButton.bounds toView:header];
         for (UIButton *button in @[header.imageToolsButton, header.shareButton, header.trailingButton]) {
             CGRect action = [button convertRect:button.bounds toView:header];

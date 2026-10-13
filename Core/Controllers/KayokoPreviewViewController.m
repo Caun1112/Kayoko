@@ -141,6 +141,9 @@ NS_ASSUME_NONNULL_END
     [self refreshImageRestoreAvailability];
     [self updateShareButtonState];
     [self updateTextActionButtons];
+    // showImage may already have laid out this subtree with the previous header
+    // state. Settle the new button positions before the preview is presented.
+    [headerView layoutIfNeeded];
 }
 
 #pragma mark - Actions

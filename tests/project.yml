@@ -52,6 +52,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mlgm.kayoko.editor-tests
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: ""
         HEADER_SEARCH_PATHS:
           - $(inherited)
           - $(SRCROOT)/../Core/Controllers
